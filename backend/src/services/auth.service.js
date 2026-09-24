@@ -47,8 +47,6 @@ export const createAccount = async (userData) => {
   return user;
 };
 
-export const logout = async () => {};
-
 export const changePassword = async () => {};
 
 export const refreshToken = async () => {};

@@ -60,3 +60,11 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 };
 
 export default mongoose.model("User", userSchema);
+
+// Asi estaba antes. Estos serian los sectores que hay que crear.
+// enum: [
+//        "student_affairs",
+//        "secretary_office",
+//        "school_administration",
+//        "teachers",
+//      ], // Preceptoria, secretaria, direccion, profesores.

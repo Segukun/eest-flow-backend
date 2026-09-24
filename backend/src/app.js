@@ -3,9 +3,9 @@ import cors from "cors";
 import express from "express";
 import { errorHandler } from "./middlewares/error.middleware.js";
 import authRoutes from "./routes/auth.routes.js";
+import sectorRoutes from "./routes/sector.routes.js";
 import taskRoutes from "./routes/task.routes.js";
 import userRoutes from "./routes/user.routes.js";
-import sectorRoutes from "./routes/sector.routes.js";
 
 const app = express();
 

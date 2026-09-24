@@ -16,8 +16,7 @@ const taskSchema = new mongoose.Schema(
     },
 
     assignedUser: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
       default: null,
     },
 
@@ -33,7 +32,8 @@ const taskSchema = new mongoose.Schema(
     },
 
     category: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
       default: null,
     },
 
