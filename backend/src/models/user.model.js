@@ -23,15 +23,12 @@ const userSchema = new mongoose.Schema(
       enum: ["admin", "collaborator"],
       default: "collaborator",
     },
-    sector: {
-      type: String,
-      required: true,
-      enum: [
-        "student_affairs",
-        "secretary_office",
-        "school_administration",
-        "teachers",
-      ], // Preceptoria, secretaria, direccion, profesores.
+    sectors: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Sector" }],
+      validate: {
+        validator: (arr) => arr.length > 0,
+        message: "user must belong to at least one sector",
+      },
     },
     active: {
       type: Boolean,
