@@ -1,4 +1,5 @@
 import * as authService from "../services/auth.service.js";
+import * as sectorService from "../services/sector.service.js";
 
 export async function login(req, res, next) {
   try {
@@ -37,7 +38,7 @@ export async function logout(req, res, next) {
 
 export async function createAccount(req, res, next) {
   try {
-    const { name, email, password, sector } = req.body;
+    const { name, email, password, sectors } = req.body;
 
     if (!name) {
       return res.status(400).json({ message: "Name is required" });
@@ -48,15 +49,19 @@ export async function createAccount(req, res, next) {
     if (!password) {
       return res.status(400).json({ message: "Password is required" });
     }
-    if (!sector) {
-      return res.status(400).json({ message: "Sector is required" });
+    if (!Array.isArray(sectors) || sectors.length === 0) {
+      return res.status(400).json({ message: "At least one sector is required" });
     }
+
+    // valida que todos los sectors enviados existan y estén activos
+    // antes de tocar la base de usuarios
+    await sectorService.validateSectorsExist(sectors);
 
     const result = await authService.createAccount({
       name,
       email,
       password,
-      sector,
+      sectors,
     });
 
     return res.status(200).json({
