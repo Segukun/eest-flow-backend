@@ -50,11 +50,12 @@ export async function createAccount(req, res, next) {
       return res.status(400).json({ message: "Password is required" });
     }
     if (!Array.isArray(sectors) || sectors.length === 0) {
-      return res.status(400).json({ message: "At least one sector is required" });
+      return res
+        .status(400)
+        .json({ message: "At least one sector is required" });
     }
 
-    // valida que todos los sectors enviados existan y estén activos
-    // antes de tocar la base de usuarios
+    // valida que todos los sectors enviados existan y estén activos antes de tocar la base de usuarios
     await sectorService.validateSectorsExist(sectors);
 
     const result = await authService.createAccount({
@@ -66,7 +67,7 @@ export async function createAccount(req, res, next) {
 
     return res.status(200).json({
       message: "Account created",
-      ...result,
+      user: result,
     });
   } catch (error) {
     return next(error);

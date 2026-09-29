@@ -1,8 +1,13 @@
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
-import { errorHandler } from "./middlewares/error.middleware.js";
+import {
+  errorHandler,
+  notFoundHandler,
+} from "./middlewares/error.middleware.js";
 import authRoutes from "./routes/auth.routes.js";
+import categoryRoutes from "./routes/category.routes.js";
+import labelRoutes from "./routes/label.routes.js";
 import sectorRoutes from "./routes/sector.routes.js";
 import taskRoutes from "./routes/task.routes.js";
 import userRoutes from "./routes/user.routes.js";
@@ -27,6 +32,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/sectors", sectorRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/labels", labelRoutes);
 
 app.use("/api/posts", postRoutes);
 app.use("/api", commentRoutes);
@@ -36,6 +43,8 @@ app.get("/api/health", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
+// sin esto Express devuelve su 404 en HTML y la API quedaría con dos formatos de error distintos según la ruta
+app.use(notFoundHandler);
 app.use(errorHandler);
 
 export default app;

@@ -2,7 +2,8 @@ import Task from "../models/task.model.js";
 import ApiError from "../utils/apiError.js";
 
 export const createTask = async (taskData) => {
-  const exists = await Task.findOne({ title: taskData.title });
+  // el filtro incluye deletedAt: null para que un título liberado por un soft delete vuelva a estar disponible
+  const exists = await Task.findOne({ title: taskData.title, deletedAt: null });
 
   if (exists) {
     throw new ApiError(409, "A task with that title already exists");
@@ -16,7 +17,7 @@ export const getTasks = async () => {
 };
 
 export const getTasksById = async (taskId) => {
-  const task = await Task.findOne({ id: taskId });
+  const task = await Task.findOne({ _id: taskId, deletedAt: null });
 
   if (!task) {
     throw new ApiError(404, "Task not found");
@@ -26,10 +27,14 @@ export const getTasksById = async (taskId) => {
 };
 
 export const updateTask = async (taskId, taskData) => {
-  const task = await Task.findByIdAndUpdate(taskId, taskData, {
-    new: true,
-    runValidators: true,
-  });
+  const task = await Task.findOneAndUpdate(
+    { _id: taskId, deletedAt: null },
+    taskData,
+    {
+      returnDocument: "after",
+      runValidators: true,
+    },
+  );
 
   if (!task) {
     throw new ApiError(404, "Task not found");
@@ -42,7 +47,7 @@ export const softDeleteTask = async (taskId) => {
   const task = await Task.findByIdAndUpdate(
     taskId,
     { deletedAt: new Date() },
-    { new: true },
+    { returnDocument: "after" },
   );
 
   if (!task) {

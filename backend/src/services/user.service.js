@@ -23,9 +23,9 @@ export const updateUser = async (userId, requester, payload) => {
     throw new ApiError(403, "Forbidden");
   }
 
-  // un collaborator solo puede tocar sus propios datos básicos;
-  // sectors y accountType quedan reservados a admin, incluso sobre sí mismo
-  const allowedFields = isAdmin ? ["name", "email", "sectors", "accountType"] : ["name", "email"];
+  const allowedFields = isAdmin
+    ? ["name", "email", "sectors", "accountType"]
+    : ["name", "email"];
 
   const updates = {};
   for (const field of allowedFields) {
@@ -36,8 +36,18 @@ export const updateUser = async (userId, requester, payload) => {
     await sectorService.validateSectorsExist(updates.sectors);
   }
 
+  if (updates.email) {
+    const emailTaken = await User.findOne({
+      email: updates.email,
+      _id: { $ne: userId },
+    });
+    if (emailTaken) {
+      throw new ApiError(409, "Email already exists");
+    }
+  }
+
   const user = await User.findByIdAndUpdate(userId, updates, {
-    new: true,
+    returnDocument: "after",
     runValidators: true,
   }).populate("sectors", "name color");
 
@@ -46,7 +56,11 @@ export const updateUser = async (userId, requester, payload) => {
 };
 
 export const disableUser = async (userId) => {
-  const user = await User.findByIdAndUpdate(userId, { active: false }, { new: true });
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { active: false },
+    { returnDocument: "after" },
+  );
   if (!user) throw new ApiError(404, "User not found");
   return user;
 };

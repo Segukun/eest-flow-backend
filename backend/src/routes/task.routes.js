@@ -14,7 +14,7 @@ import { taskSchema } from "../middlewares/validators/task.validator.js";
 
 const router = Router();
 
-router.post("/", validate(taskSchema), authenticate, createTask);
+router.post("/", authenticate, validate(taskSchema), createTask);
 router.get("/", authenticate, getTasks);
 router.get("/:id", authenticate, getTasksById);
 router.put("/:id", authenticate, updateTask);

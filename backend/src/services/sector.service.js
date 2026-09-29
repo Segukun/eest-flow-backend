@@ -21,21 +21,26 @@ export const getSectorById = async (sectorId) => {
   return sector;
 };
 
-export const updateSector = async (sectorId, { name, description, color, icon }) => {
+export const updateSector = async (
+  sectorId,
+  { name, description, color, icon },
+) => {
   const sector = await Sector.findByIdAndUpdate(
     sectorId,
     { name, description, color, icon },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   );
 
   if (!sector) throw new ApiError(404, "Sector not found");
   return sector;
 };
 
-// soft-delete: bloquea si todavía hay usuarios activos en ese sector,
-// para no dejar referencias huérfanas en User.sectors
+// soft-delete: bloquea si todavía hay usuarios activos en ese sector, para no dejar referencias huérfanas en User.sectors
 export const disableSector = async (sectorId) => {
-  const membersCount = await User.countDocuments({ sectors: sectorId, active: true });
+  const membersCount = await User.countDocuments({
+    sectors: sectorId,
+    active: true,
+  });
   if (membersCount > 0) {
     throw new ApiError(
       409,
@@ -43,7 +48,11 @@ export const disableSector = async (sectorId) => {
     );
   }
 
-  const sector = await Sector.findByIdAndUpdate(sectorId, { active: false }, { new: true });
+  const sector = await Sector.findByIdAndUpdate(
+    sectorId,
+    { active: false },
+    { returnDocument: "after" },
+  );
   if (!sector) throw new ApiError(404, "Sector not found");
   return sector;
 };
@@ -59,8 +68,7 @@ export const getSectorMembers = async (sectorId) => {
   return { sector, members };
 };
 
-// usado por user.service.js para validar que todos los sectors
-// enviados al crear/actualizar un usuario existan y estén activos
+// usado por user.service.js para validar que todos los sectors enviados al crear/actualizar un usuario existan y estén activos
 export const validateSectorsExist = async (sectorIds = []) => {
   if (!Array.isArray(sectorIds) || sectorIds.length === 0) {
     throw new ApiError(400, "sectors must be a non-empty array");

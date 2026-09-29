@@ -25,25 +25,27 @@ export const login = async (userData) => {
     },
   );
 
-  delete user.password;
+  user.password = undefined;
 
   return { user, token };
 };
 
 export const createAccount = async (userData) => {
-  // Importante destacar que solo el admin puede crear cuentas
   const existingUser = await User.findOne({ email: userData.email });
   if (existingUser) {
     throw new ApiError(409, "Email already exists");
   }
 
-  const hashedPassword = bcrypt.hashSync(
+  const hashedPassword = await bcrypt.hash(
     userData.password,
     Number(process.env.SALT_ROUNDS),
   );
   const user = new User({ ...userData, password: hashedPassword });
 
   await user.save();
+
+  user.password = undefined;
+
   return user;
 };
 

@@ -43,6 +43,11 @@ const taskSchema = new mongoose.Schema(
       default: "pending",
     },
 
+    labels: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Label" }],
+      default: [],
+    },
+
     deletedAt: {
       type: Date,
       default: null,

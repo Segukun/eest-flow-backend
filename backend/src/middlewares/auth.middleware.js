@@ -9,7 +9,13 @@ export async function authenticate(req, res, next) {
       throw new ApiError(401, "Authentication required");
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
+      throw new ApiError(401, "Invalid or expired token");
+    }
+
     const user = await User.findById(decoded.id);
 
     if (!user?.active) {
