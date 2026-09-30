@@ -6,6 +6,9 @@ import authRoutes from "./routes/auth.routes.js";
 import sectorRoutes from "./routes/sector.routes.js";
 import taskRoutes from "./routes/task.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import postRoutes from "./routes/post.routes.js";
+import commentRoutes from "./routes/comment.routes.js";
+import likeRoutes from "./routes/like.routes.js";
 
 const app = express();
 
@@ -24,6 +27,10 @@ app.use("/api/auth", authRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/sectors", sectorRoutes);
+
+app.use("/api/posts", postRoutes);
+app.use("/api", commentRoutes);
+app.use("/api", likeRoutes);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({ status: "ok" });
