@@ -10,11 +10,22 @@ import ApiError from "../utils/apiError.js";
 
 export async function createPost(req, res, next) {
   try {
+    const sectorId = req.user.sectors?.[0];
+
+    if (!sectorId) {
+      return next(
+        new ApiError(
+          400,
+          "The user does not have an assigned sector",
+        ),
+      );
+    }
+
     const post = await createPostService({
       authorId: req.user._id,
-      sectorId: req.body.sectorId,
+      sectorId,
       content: parseContent(req.body.content),
-      files: req.files,
+      files: req.files ?? [],
     });
 
     return res.status(201).json({
@@ -94,7 +105,10 @@ function parseContent(content) {
     try {
       return JSON.parse(content);
     } catch {
-      throw new ApiError(400, "Invalid content JSON");
+      throw new ApiError(
+        400,
+        "Invalid content JSON",
+      );
     }
   }
 
