@@ -8,9 +8,20 @@ const STATUS_BY_ERROR_NAME = {
 
 const DUPLICATE_KEY_CODE = 11000;
 
+const MULTER_STATUS_BY_CODE = {
+  LIMIT_FILE_SIZE: 413,
+  LIMIT_FILE_COUNT: 400,
+  LIMIT_PART_COUNT: 400,
+  LIMIT_FIELD_COUNT: 400,
+  LIMIT_FIELD_KEY: 400,
+  LIMIT_FIELD_VALUE: 400,
+  LIMIT_UNEXPECTED_FILE: 400,
+};
+
 function resolveStatusCode(err) {
   if (err instanceof ApiError || err.statusCode) return err.statusCode;
   if (err.code === DUPLICATE_KEY_CODE) return 409;
+  if (err.name === "MulterError") return MULTER_STATUS_BY_CODE[err.code] ?? 400;
   return STATUS_BY_ERROR_NAME[err.name] ?? 500;
 }
 

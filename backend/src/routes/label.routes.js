@@ -26,7 +26,13 @@ router.post(
   validate(labelSchema),
   createLabel,
 );
-router.put("/:id", authenticate, authorize("admin"), updateLabel);
+router.put(
+  "/:id",
+  authenticate,
+  authorize("admin"),
+  validate(labelSchema.partial()),
+  updateLabel,
+);
 router.delete("/:id", authenticate, authorize("admin"), disableLabel);
 
 export default router;

@@ -23,7 +23,12 @@ router.post(
 );
 router.get("/", authenticate, getCategories);
 router.get("/:id", authenticate, getCategoryById);
-router.put("/:id", authenticate, updateCategory);
+router.put(
+  "/:id",
+  authenticate,
+  validate(categorySchema.partial()),
+  updateCategory,
+);
 router.delete("/:id", authenticate, authorize("admin"), softDeleteCategory);
 
 export default router;

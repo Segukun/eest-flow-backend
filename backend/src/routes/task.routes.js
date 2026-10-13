@@ -17,7 +17,7 @@ const router = Router();
 router.post("/", authenticate, validate(taskSchema), createTask);
 router.get("/", authenticate, getTasks);
 router.get("/:id", authenticate, getTasksById);
-router.put("/:id", authenticate, updateTask);
+router.put("/:id", authenticate, validate(taskSchema.partial()), updateTask);
 router.delete("/:id", authenticate, authorize("admin"), softDeleteTask);
 
 export default router;

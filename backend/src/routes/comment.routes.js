@@ -8,6 +8,11 @@ import {
 } from "../controllers/comment.controller.js";
 
 import { authenticate } from "../middlewares/auth.middleware.js";
+import { validate } from "../middlewares/validate.middleware.js";
+import {
+  createCommentSchema,
+  updateCommentSchema,
+} from "../middlewares/validators/comment.validator.js";
 
 const router = Router();
 
@@ -20,12 +25,14 @@ router.get(
 router.post(
   "/posts/:postId/comments",
   authenticate,
+  validate(createCommentSchema),
   createComment,
 );
 
 router.put(
   "/comments/:id",
   authenticate,
+  validate(updateCommentSchema),
   updateComment,
 );
 

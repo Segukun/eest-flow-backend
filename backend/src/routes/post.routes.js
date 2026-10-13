@@ -10,6 +10,11 @@ import {
 
 import { authenticate } from "../middlewares/auth.middleware.js";
 import { uploadPostFilesMiddleware } from "../middlewares/upload.middleware.js";
+import { validate } from "../middlewares/validate.middleware.js";
+import {
+  createPostSchema,
+  updatePostSchema,
+} from "../middlewares/validators/post.validator.js";
 
 const router = Router();
 
@@ -17,9 +22,15 @@ router.get("/", authenticate, getPosts);
 
 router.get("/:id", authenticate, getPostById);
 
-router.post("/", authenticate, uploadPostFilesMiddleware, createPost);
+router.post(
+  "/",
+  authenticate,
+  uploadPostFilesMiddleware,
+  validate(createPostSchema),
+  createPost,
+);
 
-router.put("/:id", authenticate, updatePost);
+router.put("/:id", authenticate, validate(updatePostSchema), updatePost);
 
 router.delete("/:id", authenticate, deletePost);
 

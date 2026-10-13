@@ -40,21 +40,6 @@ export async function createAccount(req, res, next) {
   try {
     const { name, email, password, sectors } = req.body;
 
-    if (!name) {
-      return res.status(400).json({ message: "Name is required" });
-    }
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
-    }
-    if (!password) {
-      return res.status(400).json({ message: "Password is required" });
-    }
-    if (!Array.isArray(sectors) || sectors.length === 0) {
-      return res
-        .status(400)
-        .json({ message: "At least one sector is required" });
-    }
-
     // valida que todos los sectors enviados existan y estén activos antes de tocar la base de usuarios
     await sectorService.validateSectorsExist(sectors);
 

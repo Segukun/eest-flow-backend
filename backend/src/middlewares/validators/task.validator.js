@@ -3,7 +3,10 @@ import { objectId } from "./common.validator.js";
 
 export const taskSchema = z.object({
   title: z.string().min(1, "Title is required").max(50, "Max 50 characters"),
-  description: z.string().min(1, "Description is required"),
+  description: z
+    .string()
+    .min(1, "Description is required")
+    .max(500, "Max 500 characters"),
   assignedUser: z.array(objectId("Invalid assignedUser id")).optional(),
   dueDate: z.coerce.date().nullable().optional(),
   priority: z.enum(["low", "medium", "high"]),

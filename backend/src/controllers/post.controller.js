@@ -1,27 +1,19 @@
-import {
-  createPost as createPostService,
-  getPosts as getPostsService,
-  getPostById as getPostByIdService,
-  updatePost as updatePostService,
-  disablePost as disablePostService,
-} from "../services/post.service.js";
+import * as postService from "../services/post.service.js";
 
 import ApiError from "../utils/apiError.js";
 
 export async function createPost(req, res, next) {
   try {
-    const sectorId = req.user.sectors?.[0];
+    // el cliente puede elegir el sector; si no lo manda, se usa el primero del usuario
+    const sectorId = req.body.sector ?? req.user.sectors?.[0];
 
     if (!sectorId) {
       return next(
-        new ApiError(
-          400,
-          "The user does not have an assigned sector",
-        ),
+        new ApiError(400, "No sector provided and the user has none assigned"),
       );
     }
 
-    const post = await createPostService({
+    const post = await postService.createPost({
       authorId: req.user._id,
       sectorId,
       content: parseContent(req.body.content),
@@ -39,7 +31,7 @@ export async function createPost(req, res, next) {
 
 export async function getPosts(req, res, next) {
   try {
-    const result = await getPostsService({
+    const result = await postService.getPosts({
       page: req.query.page,
       limit: req.query.limit,
       sectorId: req.query.sectorId,
@@ -56,10 +48,7 @@ export async function getPosts(req, res, next) {
 
 export async function getPostById(req, res, next) {
   try {
-    const post = await getPostByIdService(
-      req.params.id,
-      req.user._id,
-    );
+    const post = await postService.getPostById(req.params.id, req.user._id);
 
     return res.status(200).json({
       data: post,
@@ -71,7 +60,7 @@ export async function getPostById(req, res, next) {
 
 export async function updatePost(req, res, next) {
   try {
-    const post = await updatePostService({
+    const post = await postService.updatePost({
       postId: req.params.id,
       user: req.user,
       content: req.body.content,
@@ -89,7 +78,7 @@ export async function updatePost(req, res, next) {
 
 export async function deletePost(req, res, next) {
   try {
-    const result = await disablePostService({
+    const result = await postService.disablePost({
       postId: req.params.id,
       user: req.user,
     });

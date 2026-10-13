@@ -1,13 +1,8 @@
-import {
-  createComment as createCommentService,
-  getComments as getCommentsService,
-  updateComment as updateCommentService,
-  disableComment as disableCommentService,
-} from "../services/comment.service.js";
+import * as commentService from "../services/comment.service.js";
 
 export async function createComment(req, res, next) {
   try {
-    const comment = await createCommentService({
+    const comment = await commentService.createComment({
       postId: req.params.postId,
       authorId: req.user._id,
       content: req.body.content,
@@ -25,7 +20,7 @@ export async function createComment(req, res, next) {
 
 export async function getComments(req, res, next) {
   try {
-    const result = await getCommentsService({
+    const result = await commentService.getComments({
       postId: req.params.postId,
       page: req.query.page,
       limit: req.query.limit,
@@ -41,7 +36,7 @@ export async function getComments(req, res, next) {
 
 export async function updateComment(req, res, next) {
   try {
-    const comment = await updateCommentService({
+    const comment = await commentService.updateComment({
       commentId: req.params.id,
       user: req.user,
       content: req.body.content,
@@ -58,7 +53,7 @@ export async function updateComment(req, res, next) {
 
 export async function deleteComment(req, res, next) {
   try {
-    const result = await disableCommentService({
+    const result = await commentService.disableComment({
       commentId: req.params.id,
       user: req.user,
     });
