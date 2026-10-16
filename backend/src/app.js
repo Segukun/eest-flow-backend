@@ -13,6 +13,7 @@ import likeRoutes from "./routes/like.routes.js";
 import sectorRoutes from "./routes/sector.routes.js";
 import taskRoutes from "./routes/task.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import notificationRoutes from "./routes/notification.routes.js";
 
 // routes/post.routes.js arrastra config/supabase.js, que lanza al importarse si no
 // encuentra SUPABASE_URL / SUPABASE_SECRET_KEY. Como las rutas cuelgan de app.js,
@@ -52,6 +53,8 @@ if (postRoutes) {
 
 app.use("/api", commentRoutes);
 app.use("/api", likeRoutes);
+
+app.use("/api/notifications", notificationRoutes);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({ status: "ok" });
