@@ -59,6 +59,58 @@ export async function createAccount(req, res, next) {
   }
 }
 
+export async function forgotPassword(req, res, next) {
+  try {
+    const { email } = req.body;
+
+    const result = await authService.forgotPassword({ email });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function resendCode(req, res, next) {
+  try {
+    const { email } = req.body;
+
+    const result = await authService.resendCode({ email });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function verifyCode(req, res, next) {
+  try {
+    const { email, code } = req.body;
+
+    const result = await authService.verifyCode({ email, code });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function resetPassword(req, res, next) {
+  try {
+    const { email, resetToken, newPassword } = req.body;
+
+    const result = await authService.changePassword({
+      email,
+      resetToken,
+      newPassword,
+    });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 export async function refreshToken(req, res, next) {
   return res.status(200).json({ message: "Actualizar token" });
 }

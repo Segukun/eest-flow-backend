@@ -51,6 +51,14 @@ const userSchema = new mongoose.Schema(
       type: Date,
       select: false,
     },
+    resetCode: {
+      type: String,
+      select: false,
+    },
+    resetCodeExpires: {
+      type: Date,
+      select: false,
+    },
   },
   { timestamps: true },
 );

@@ -114,6 +114,17 @@ El backend deberá permitir:
 
 No existe registro público de usuarios.
 
+## Recuperación de contraseña
+
+Flujo de tres pasos para que un usuario restablezca su contraseña mediante un código enviado por email. Todos los endpoints son públicos (no requieren sesión) y devuelven JSON.
+
+- `POST /api/auth/forgot-password` — body `{ email }` — responde `{ existe: true }` si el email existe (y le envía un código) o `{ existe: false }` si no.
+- `POST /api/auth/resend-code` — body `{ email }` — genera y envía un código nuevo, invalidando el anterior; responde `{ ok: true }` o `{ ok: false }` si el email no existe.
+- `POST /api/auth/verify-code` — body `{ email, code }` — responde `{ valido: true, resetToken }` si el código es correcto y no venció, o `{ valido: false }` en caso contrario.
+- `POST /api/auth/reset-password` — body `{ email, resetToken, newPassword }` — responde `{ ok: true }` y guarda la nueva contraseña (hasheada con bcrypt).
+
+El código tiene 6 dígitos y vence a los 10 minutos. El `resetToken` también vence a los 10 minutos y es de un solo uso: al usarlo o al pedir un código nuevo se invalida el anterior.
+
 ## Instalación
 
 Cuando el proyecto esté configurado, las dependencias se instalarán con:
@@ -131,6 +142,15 @@ El comando definitivo para ejecutar el backend se documentará cuando se configu
 El proyecto utilizará variables de entorno mediante dotenv.
 
 Cuando se configure el backend deberá agregarse un archivo `.env.example` que muestre las variables necesarias sin incluir información privada.
+
+Además de las variables de base de datos y autenticación, la recuperación de contraseña requiere configurar el envío de emails por SMTP:
+
+- `SMTP_HOST`: servidor SMTP (ej. `smtp.gmail.com`).
+- `SMTP_PORT`: puerto (`587` para TLS, `465` para SSL).
+- `SMTP_SECURE`: `true`/`false`; si se omite se deduce del puerto.
+- `SMTP_USER`: cuenta desde la que se envían los correos.
+- `SMTP_PASS`: contraseña de aplicación o clave SMTP.
+- `SMTP_FROM`: remitente visible (si se omite usa `SMTP_USER`).
 
 No se deben subir al repositorio:
 
