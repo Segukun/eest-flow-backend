@@ -8,6 +8,7 @@ const notificationSchema = new mongoose.Schema(
       required: true,
     },
     actor: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    post: { type: mongoose.Schema.Types.ObjectId, ref: "Post", default: null },
     category: {
       type: String,
       enum: ["system", "forum", "task"],
@@ -26,6 +27,7 @@ const notificationSchema = new mongoose.Schema(
 );
 
 notificationSchema.index({ recipient: 1, read: 1, createdAt: -1 });
+notificationSchema.index({ post: 1 });
 notificationSchema.index(
   { recipient: 1, dedupeKey: 1 },
   { unique: true, partialFilterExpression: { dedupeKey: { $type: "string" } } },

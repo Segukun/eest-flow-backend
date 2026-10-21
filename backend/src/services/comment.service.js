@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import Comment from "../models/comment.model.js";
 import Post from "../models/post.model.js";
 import ApiError from "../utils/apiError.js";
+import { safeNotify } from "./notification.service.js";
 
 function validateObjectId(id, fieldName = "id") {
   if (!mongoose.isValidObjectId(id)) {
@@ -41,10 +42,12 @@ export async function createComment({
     throw new ApiError(404, "Post not found");
   }
 
+  let parentComment = null;
+
   if (parentCommentId) {
     validateObjectId(parentCommentId, "parentCommentId");
 
-    const parentComment = await Comment.findOne({
+    parentComment = await Comment.findOne({
       _id: parentCommentId,
       post: postId,
       active: true,
@@ -83,6 +86,33 @@ export async function createComment({
         { session },
       );
     });
+
+    const excerpt = text.length > 120 ? `${text.slice(0, 120)}...` : text;
+
+    // Se notifica fuera de la transacción y sin lanzar: un fallo al notificar no debe deshacer un comentario que ya se guardó.
+    if (parentComment) {
+      await safeNotify({
+        recipients: [parentComment.author],
+        actorId: authorId,
+        post: postId,
+        category: "forum",
+        type: "comment_reply",
+        title: "Respondieron a tu comentario",
+        description: excerpt,
+        link: `/foro?post=${postId}`,
+      });
+    } else {
+      await safeNotify({
+        recipients: [post.author],
+        actorId: authorId,
+        post: postId,
+        category: "forum",
+        type: "post_comment",
+        title: "Nuevo comentario en tu publicación",
+        description: excerpt,
+        link: `/foro?post=${postId}`,
+      });
+    }
 
     return await Comment.findById(comment._id)
       .populate("author", "name email accountType")

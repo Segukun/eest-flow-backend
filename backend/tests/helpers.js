@@ -3,7 +3,11 @@ import supertest from "supertest";
 
 import app from "../src/app.js";
 import Category from "../src/models/category.model.js";
+import Comment from "../src/models/comment.model.js";
 import Label from "../src/models/label.model.js";
+import Like from "../src/models/like.model.js";
+import Notification from "../src/models/notification.model.js";
+import Post from "../src/models/post.model.js";
 import Sector from "../src/models/sector.model.js";
 import Task from "../src/models/task.model.js";
 import User from "../src/models/user.model.js";
@@ -26,6 +30,10 @@ export async function resetDatabase() {
     Category.deleteMany({}),
     Label.deleteMany({}),
     Sector.deleteMany({}),
+    Post.deleteMany({}),
+    Comment.deleteMany({}),
+    Like.deleteMany({}),
+    Notification.deleteMany({}),
   ]);
 }
 
@@ -70,6 +78,22 @@ export async function createUser(overrides = {}) {
   });
 }
 
+export async function createPost(overrides = {}) {
+  return Post.create({
+    content: overrides.content ?? [
+      { type: "paragraph", text: unique("post") },
+    ],
+    ...overrides,
+  });
+}
+
+export async function createComment(overrides = {}) {
+  return Comment.create({
+    content: overrides.content ?? unique("comment"),
+    ...overrides,
+  });
+}
+
 // ----------------------------------------------------------------- agents --
 
 // Un `request.agent()` mantiene el cookie de sesión entre llamadas, que es como funciona el frontend real.
@@ -99,6 +123,14 @@ export async function adminClient(overrides = {}) {
     sectors,
   });
   return loginAs(user, overrides.password);
+}
+
+// Igual que adminClient, pero colaborador y devuelve también el usuario (hace falta para revisar destinatarios de notificaciones).
+export async function userClient(overrides = {}) {
+  const sectors = overrides.sectors ?? [(await createSector())._id];
+  const user = await createUser({ ...overrides, sectors });
+  const session = await loginAs(user, overrides.password);
+  return { user, ...session };
 }
 
 export const validTask = (overrides = {}) => ({
