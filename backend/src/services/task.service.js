@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Task from "../models/task.model.js";
 import ApiError from "../utils/apiError.js";
 import { safeNotify } from "./notification.service.js";
@@ -15,19 +16,32 @@ const notifyAssigned = (task, recipients, actor) =>
     link: `/?task=${task._id}`,
   });
 
+// posición libre al final de una columna
+const nextPosition = async (category, state, excludeId = null) => {
+  const filter = { deletedAt: null, category: category ?? null, state };
+  if (excludeId) filter._id = { $ne: excludeId };
+
+  const last = await Task.findOne(filter).sort({ position: -1 }).select("position");
+  return (last?.position ?? -1) + 1;
+};
+
 export const createTask = async (taskData, actor) => {
   const exists = await Task.findOne({ title: taskData.title, deletedAt: null });
   if (exists) {
     throw new ApiError(409, "A task with that title already exists");
   }
 
-  const task = await Task.create(taskData);
+  const state = taskData.state ?? "pending";
+  const position = await nextPosition(taskData.category, state);
+
+  const task = await Task.create({ ...taskData, state, position });
   await notifyAssigned(task, toIds(task.assignedUser), actor);
   return task;
 };
 
 export const getTasks = async () => {
-  return await Task.find({ deletedAt: null });
+  // el orden por posición se respeta dentro de cada columna
+  return await Task.find({ deletedAt: null }).sort({ position: 1, createdAt: 1 });
 };
 
 export const getTasksById = async (taskId) => {
@@ -37,11 +51,23 @@ export const getTasksById = async (taskId) => {
 };
 
 export const updateTask = async (taskId, taskData, actor) => {
-  // necesitamos los asignados anteriores para saber quién es NUEVO
-  const previous = await Task.findOne({ _id: taskId, deletedAt: null }).select("assignedUser");
+  const previous = await Task.findOne({ _id: taskId, deletedAt: null }).select(
+    "assignedUser state category",
+  );
   if (!previous) throw new ApiError(404, "Task not found");
 
-  const task = await Task.findOneAndUpdate({ _id: taskId, deletedAt: null }, taskData, {
+  const update = { ...taskData };
+
+  // si cambia de columna por edición (no por drag and drop), queda al final de la nueva
+  if (update.state !== undefined && update.state !== previous.state) {
+    update.position = await nextPosition(
+      update.category ?? previous.category,
+      update.state,
+      taskId,
+    );
+  }
+
+  const task = await Task.findOneAndUpdate({ _id: taskId, deletedAt: null }, update, {
     returnDocument: "after",
     runValidators: true,
   });
@@ -54,6 +80,56 @@ export const updateTask = async (taskId, taskData, actor) => {
   }
 
   return task;
+};
+
+/**
+ * Mueve una tarea a una columna y la inserta ANTES de `beforeId`
+ * (null = al final). Renumera toda la columna destino para que las
+ * posiciones queden consecutivas y sin empates.
+ */
+export const moveTask = async (taskId, { state, beforeId = null }) => {
+  if (!mongoose.isValidObjectId(taskId)) throw new ApiError(400, "Invalid task id");
+
+  const task = await Task.findOne({ _id: taskId, deletedAt: null }).select("category state");
+  if (!task) throw new ApiError(404, "Task not found");
+
+  // soltar una tarjeta sobre sí misma no cambia nada
+  if (beforeId && String(beforeId) === String(taskId)) {
+    return await Task.findById(taskId);
+  }
+
+  const siblings = await Task.find({
+    deletedAt: null,
+    category: task.category ?? null,
+    state,
+    _id: { $ne: taskId },
+  })
+    .sort({ position: 1, createdAt: 1 })
+    .select("_id");
+
+  const ids = siblings.map((t) => String(t._id));
+
+  let index = ids.length;
+  if (beforeId) {
+    index = ids.indexOf(String(beforeId));
+    if (index === -1) {
+      // la tarjeta de referencia ya no está en esa columna (otro usuario la movió)
+      throw new ApiError(409, "The reference task is no longer in that column");
+    }
+  }
+
+  ids.splice(index, 0, String(taskId));
+
+  await Task.bulkWrite(
+    ids.map((id, position) => ({
+      updateOne: {
+        filter: { _id: id },
+        update: { $set: id === String(taskId) ? { position, state } : { position } },
+      },
+    })),
+  );
+
+  return await Task.findById(taskId);
 };
 
 export const softDeleteTask = async (taskId) => {

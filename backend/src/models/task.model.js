@@ -43,6 +43,12 @@ const taskSchema = new mongoose.Schema(
       default: "pending",
     },
 
+    // orden vertical dentro de (category + state); menor = más arriba
+    position: {
+      type: Number,
+      default: 0,
+    },
+
     labels: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Label" }],
       default: [],
@@ -55,4 +61,7 @@ const taskSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+taskSchema.index({ category: 1, state: 1, position: 1 });
+
 export default mongoose.model("Task", taskSchema);
