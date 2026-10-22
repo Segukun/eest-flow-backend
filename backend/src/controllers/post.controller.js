@@ -103,3 +103,16 @@ function parseContent(content) {
 
   return content;
 }
+
+export async function pinPost(req, res, next) {
+  try {
+    const post = await setPostPinned({
+      postId: req.params.id,
+      user: req.user,
+      pinned: req.body.pinned,
+    });
+    return res.status(200).json({ data: post });
+  } catch (error) {
+    return next(error);
+  }
+}

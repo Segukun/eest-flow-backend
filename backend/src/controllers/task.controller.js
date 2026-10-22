@@ -13,16 +13,7 @@ export async function createTask(req, res, next) {
       labels,
     } = req.body;
 
-    const task = await taskService.createTask({
-      title,
-      description,
-      assignedUser,
-      dueDate,
-      priority,
-      category,
-      state,
-      labels,
-    });
+    const task = await taskService.createTask({ title, description, assignedUser, dueDate, priority, category, state, labels }, req.user);
     return res.status(201).json(task);
   } catch (error) {
     return next(error);
@@ -61,16 +52,7 @@ export async function updateTask(req, res, next) {
       state,
       labels,
     } = req.body;
-    const updatedTask = await taskService.updateTask(id, {
-      title,
-      description,
-      assignedUser,
-      dueDate,
-      priority,
-      category,
-      state,
-      labels,
-    });
+    const updatedTask = await taskService.updateTask(id, { title, description, assignedUser, dueDate, priority, category, state, labels }, req.user);
     return res.status(200).json(updatedTask);
   } catch (error) {
     return next(error);

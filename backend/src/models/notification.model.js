@@ -25,6 +25,7 @@ const notificationSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 24 * 60 * 60 });
 notificationSchema.index({ recipient: 1, read: 1, createdAt: -1 });
 notificationSchema.index(
   { recipient: 1, dedupeKey: 1 },

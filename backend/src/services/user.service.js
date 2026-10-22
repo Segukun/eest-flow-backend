@@ -15,6 +15,8 @@ export const getUsers = async ({ sector } = {}) => {
   return await User.find(filter).populate("sectors", "name color");
 };
 
+import { safeNotify } from "./notification.service.js";
+
 export const updateUser = async (userId, requester, payload) => {
   const isSelf = requester._id.toString() === userId;
   const isAdmin = requester.accountType === "admin";
@@ -32,18 +34,16 @@ export const updateUser = async (userId, requester, payload) => {
     if (payload[field] !== undefined) updates[field] = payload[field];
   }
 
+  let previousSectorIds = null;
   if (updates.sectors) {
     await sectorService.validateSectorsExist(updates.sectors);
+    const before = await User.findById(userId).select("sectors");
+    previousSectorIds = (before?.sectors ?? []).map(String);
   }
 
   if (updates.email) {
-    const emailTaken = await User.findOne({
-      email: updates.email,
-      _id: { $ne: userId },
-    });
-    if (emailTaken) {
-      throw new ApiError(409, "Email already exists");
-    }
+    const emailTaken = await User.findOne({ email: updates.email, _id: { $ne: userId } });
+    if (emailTaken) throw new ApiError(409, "Email already exists");
   }
 
   const user = await User.findByIdAndUpdate(userId, updates, {
@@ -52,6 +52,26 @@ export const updateUser = async (userId, requester, payload) => {
   }).populate("sectors", "name color");
 
   if (!user) throw new ApiError(404, "User not found");
+
+  if (previousSectorIds) {
+    const nextIds = user.sectors.map((s) => String(s._id));
+    const changed =
+      nextIds.length !== previousSectorIds.length ||
+      nextIds.some((id) => !previousSectorIds.includes(id));
+
+    if (changed) {
+      await safeNotify({
+        recipients: [userId],
+        actorId: requester._id,
+        category: "system",
+        type: "sector_changed",
+        title: "Se actualizaron tus sectores",
+        description: `Ahora pertenecés a: ${user.sectors.map((s) => s.name).join(", ")}`,
+        link: "/",
+      });
+    }
+  }
+
   return user;
 };
 

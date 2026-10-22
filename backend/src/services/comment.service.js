@@ -17,42 +17,23 @@ function canModifyComment(comment, user) {
   );
 }
 
-export async function createComment({
-  postId,
-  authorId,
-  content,
-  parentCommentId = null,
-}) {
+import { safeNotify } from "./notification.service.js";
+
+export async function createComment({ postId, authorId, content, parentCommentId = null }) {
   validateObjectId(postId, "postId");
   validateObjectId(authorId, "authorId");
 
   const text = content?.trim();
+  if (!text) throw new ApiError(400, "Comment content is required");
 
-  if (!text) {
-    throw new ApiError(400, "Comment content is required");
-  }
+  const post = await Post.findOne({ _id: postId, active: true });
+  if (!post) throw new ApiError(404, "Post not found");
 
-  const post = await Post.findOne({
-    _id: postId,
-    active: true,
-  });
-
-  if (!post) {
-    throw new ApiError(404, "Post not found");
-  }
-
+  let parentComment = null;
   if (parentCommentId) {
     validateObjectId(parentCommentId, "parentCommentId");
-
-    const parentComment = await Comment.findOne({
-      _id: parentCommentId,
-      post: postId,
-      active: true,
-    });
-
-    if (!parentComment) {
-      throw new ApiError(404, "Parent comment not found");
-    }
+    parentComment = await Comment.findOne({ _id: parentCommentId, post: postId, active: true });
+    if (!parentComment) throw new ApiError(404, "Parent comment not found");
   }
 
   const session = await mongoose.startSession();
@@ -62,32 +43,48 @@ export async function createComment({
 
     await session.withTransaction(async () => {
       [comment] = await Comment.create(
-        [
-          {
-            post: postId,
-            author: authorId,
-            content: text,
-            parentComment: parentCommentId,
-          },
-        ],
+        [{ post: postId, author: authorId, content: text, parentComment: parentCommentId }],
         { session },
       );
-
-      await Post.findByIdAndUpdate(
-        postId,
-        {
-          $inc: {
-            commentsCount: 1,
-          },
-        },
-        { session },
-      );
+      await Post.findByIdAndUpdate(postId, { $inc: { commentsCount: 1 } }, { session });
     });
 
-    return await Comment.findById(comment._id)
+    const created = await Comment.findById(comment._id)
       .populate("author", "name email accountType")
       .populate("parentComment")
       .lean();
+
+    const commenterName = created.author?.name ?? "Alguien";
+    const preview = text.length > 80 ? `${text.slice(0, 80)}…` : text;
+    const parentAuthorId = parentComment ? String(parentComment.author) : null;
+
+    // respuesta a un comentario -> avisa al autor de ese comentario
+    if (parentAuthorId) {
+      await safeNotify({
+        recipients: [parentAuthorId],
+        actorId: authorId,
+        category: "forum",
+        type: "comment_reply",
+        title: `${commenterName} respondió tu comentario`,
+        description: preview,
+        link: "/foro",
+      });
+    }
+
+    // comentario en tu publicación -> avisa al autor (si ya recibió el aviso de respuesta, no se repite)
+    if (String(post.author) !== parentAuthorId) {
+      await safeNotify({
+        recipients: [post.author],
+        actorId: authorId,
+        category: "forum",
+        type: "post_comment",
+        title: `${commenterName} comentó tu publicación`,
+        description: preview,
+        link: "/foro",
+      });
+    }
+
+    return created;
   } finally {
     await session.endSession();
   }

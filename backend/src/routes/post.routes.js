@@ -6,6 +6,7 @@ import {
   getPostById,
   getPosts,
   updatePost,
+  pinPost
 } from "../controllers/post.controller.js";
 
 import { authenticate } from "../middlewares/auth.middleware.js";
@@ -31,6 +32,8 @@ router.post(
 );
 
 router.put("/:id", authenticate, validate(updatePostSchema), updatePost);
+
+router.patch("/:id/pin", authenticate, authorize("admin"), pinPost);
 
 router.delete("/:id", authenticate, deletePost);
 
