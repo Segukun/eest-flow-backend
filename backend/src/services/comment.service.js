@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import Comment from "../models/comment.model.js";
 import Post from "../models/post.model.js";
 import ApiError from "../utils/apiError.js";
+import { safeNotify } from "./notification.service.js";
 
 function validateObjectId(id, fieldName = "id") {
   if (!mongoose.isValidObjectId(id)) {
@@ -26,14 +27,29 @@ export async function createComment({ postId, authorId, content, parentCommentId
   const text = content?.trim();
   if (!text) throw new ApiError(400, "Comment content is required");
 
-  const post = await Post.findOne({ _id: postId, active: true });
-  if (!post) throw new ApiError(404, "Post not found");
+  const post = await Post.findOne({
+    _id: postId,
+    active: true,
+  });
+
+  if (!post) {
+    throw new ApiError(404, "Post not found");
+  }
 
   let parentComment = null;
+
   if (parentCommentId) {
     validateObjectId(parentCommentId, "parentCommentId");
-    parentComment = await Comment.findOne({ _id: parentCommentId, post: postId, active: true });
-    if (!parentComment) throw new ApiError(404, "Parent comment not found");
+
+    parentComment = await Comment.findOne({
+      _id: parentCommentId,
+      post: postId,
+      active: true,
+    });
+
+    if (!parentComment) {
+      throw new ApiError(404, "Parent comment not found");
+    }
   }
 
   const session = await mongoose.startSession();
@@ -46,10 +62,46 @@ export async function createComment({ postId, authorId, content, parentCommentId
         [{ post: postId, author: authorId, content: text, parentComment: parentCommentId }],
         { session },
       );
-      await Post.findByIdAndUpdate(postId, { $inc: { commentsCount: 1 } }, { session });
+
+      await Post.findByIdAndUpdate(
+        postId,
+        {
+          $inc: {
+            commentsCount: 1,
+          },
+        },
+        { session },
+      );
     });
 
-    const created = await Comment.findById(comment._id)
+    const excerpt = text.length > 120 ? `${text.slice(0, 120)}...` : text;
+
+    // Se notifica fuera de la transacción y sin lanzar: un fallo al notificar no debe deshacer un comentario que ya se guardó.
+    if (parentComment) {
+      await safeNotify({
+        recipients: [parentComment.author],
+        actorId: authorId,
+        post: postId,
+        category: "forum",
+        type: "comment_reply",
+        title: "Respondieron a tu comentario",
+        description: excerpt,
+        link: `/foro?post=${postId}`,
+      });
+    } else {
+      await safeNotify({
+        recipients: [post.author],
+        actorId: authorId,
+        post: postId,
+        category: "forum",
+        type: "post_comment",
+        title: "Nuevo comentario en tu publicación",
+        description: excerpt,
+        link: `/foro?post=${postId}`,
+      });
+    }
+
+    return await Comment.findById(comment._id)
       .populate("author", "name email accountType")
       .populate("parentComment")
       .lean();

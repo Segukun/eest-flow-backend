@@ -1,13 +1,11 @@
 import Notification from "../models/notification.model.js";
 import ApiError from "../utils/apiError.js";
 
-/**
- * Crea una notificación por cada destinatario (sin duplicados y sin
- * notificar al autor de la acción). Lo usan los demás services.
- */
+// Crea una notificación por cada destinatario (sin duplicados y sin notificar al autor de la acción). Lo usan los demás services.
 export const notifyUsers = async ({
   recipients = [],
   actorId = null,
+  post = null,
   category,
   type,
   title,
@@ -23,6 +21,7 @@ export const notifyUsers = async ({
   const docs = ids.map((recipient) => ({
     recipient,
     actor: actorId,
+    post,
     category,
     type,
     title,
@@ -71,6 +70,7 @@ export const getNotifications = async (
 
   const [notifications, total, unreadCount] = await Promise.all([
     Notification.find(query)
+      .populate("actor", "name accountType")
       .sort({ createdAt: -1 })
       .skip((safePage - 1) * safeLimit)
       .limit(safeLimit),

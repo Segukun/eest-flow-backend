@@ -21,4 +21,34 @@ export const loginSchema = z.object({
     .max(64, "Max 64 characters"),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email().min(1, "Email is required"),
+});
+
+export const resendCodeSchema = z.object({
+  email: z.string().email().min(1, "Email is required"),
+});
+
+export const verifyCodeSchema = z.object({
+  email: z.string().email().min(1, "Email is required"),
+  code: z.string().regex(/^\d{6}$/, "Code must be 6 digits"),
+});
+
+export const resetPasswordSchema = z.object({
+  email: z.string().email().min(1, "Email is required"),
+  resetToken: z.string().min(1, "Reset token is required"),
+  newPassword: z
+    .string()
+    .min(6, "Password must be at least 6 characters")
+    .max(64, "Max 64 characters"),
+});
+
+// Cambio de contraseña con sesión iniciada (configuración del usuario). La coincidencia de las dos contraseñas se valida en el frontend.
+export const changePasswordSchema = z.object({
+  newPassword: z
+    .string()
+    .min(6, "Password must be at least 6 characters")
+    .max(64, "Max 64 characters"),
+});
+
 

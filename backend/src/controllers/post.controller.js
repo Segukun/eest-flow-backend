@@ -64,7 +64,6 @@ export async function updatePost(req, res, next) {
       postId: req.params.id,
       user: req.user,
       content: req.body.content,
-      attachments: req.body.attachments,
     });
 
     return res.status(200).json({

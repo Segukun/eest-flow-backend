@@ -1,8 +1,8 @@
-import * as postService from "../services/like.service.js";
+import * as likeService from "../services/like.service.js";
 
 export async function likePost(req, res, next) {
   try {
-    const result = await postService.likePost({
+    const result = await likeService.likePost({
       postId: req.params.postId,
       userId: req.user._id,
     });
@@ -17,7 +17,7 @@ export async function likePost(req, res, next) {
 
 export async function unlikePost(req, res, next) {
   try {
-    const result = await postService.unlikePost({
+    const result = await likeService.unlikePost({
       postId: req.params.postId,
       userId: req.user._id,
     });

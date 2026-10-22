@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import Post from "../models/post.model.js";
 import User from "../models/user.model.js";
 import Like from "../models/like.model.js";
+import Notification from "../models/notification.model.js";
 import ApiError from "../utils/apiError.js";
 
 import {
@@ -128,11 +129,12 @@ export async function createPost({
       } catch (cleanupError) {
         console.error(
           "Storage cleanup failed:",
-          cleanupError,
+          cleanupError?.message || cleanupError,
         );
       }
     }
 
+    console.error("[posts] createPost failed:", error?.message || error);
     throw error;
   }
 }
@@ -238,7 +240,6 @@ export async function updatePost({
   postId,
   user,
   content,
-  attachments,
 }) {
   validateObjectId(postId, "postId");
 
@@ -257,10 +258,6 @@ export async function updatePost({
 
   if (content !== undefined) {
     post.content = normalizeContent(content);
-  }
-
-  if (attachments !== undefined) {
-    post.attachments = attachments;
   }
 
   await post.save();
@@ -288,6 +285,27 @@ export async function disablePost({ postId, user }) {
 
   post.active = false;
   await post.save();
+
+  const attachmentPaths = (post.attachments ?? [])
+    .map((file) => file.path)
+    .filter(Boolean);
+
+  if (attachmentPaths.length > 0) {
+    try {
+      await deleteStorageFiles(attachmentPaths);
+    } catch (error) {
+      console.error("Storage cleanup failed:", error.message);
+    }
+  }
+
+  try {
+    await Notification.deleteMany({ post: postId });
+  } catch (error) {
+    console.error(
+      "[notifications] no se pudieron limpiar las del post:",
+      error.message,
+    );
+  }
 
   return {
     message: "Post deleted successfully",

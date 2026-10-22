@@ -52,6 +52,15 @@ export async function uploadPostFiles(postId, files = []) {
         });
 
       if (error) {
+        console.error("[storage] upload failed:", {
+          bucket: BUCKET,
+          path: storagePath,
+          file: file.originalname,
+          mimeType: file.mimetype,
+          size: file.size,
+          code: error.code,
+          message: error.message,
+        });
         throw new ApiError(
           500,
           `Failed to upload file: ${file.originalname}`,
@@ -94,6 +103,12 @@ export async function deleteStorageFiles(paths = []) {
     .remove(paths);
 
   if (error) {
+    console.error("[storage] delete failed:", {
+      bucket: BUCKET,
+      paths,
+      code: error.code,
+      message: error.message,
+    });
     throw new ApiError(
       500,
       "Failed to delete files from storage",

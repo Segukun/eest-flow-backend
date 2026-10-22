@@ -28,6 +28,18 @@ function resolveStatusCode(err) {
 function resolveMessage(err, statusCode) {
   if (statusCode >= 500) return "Internal server error";
   if (err.code === DUPLICATE_KEY_CODE) return "Resource already exists";
+  if (err.name === "MulterError") {
+    switch (err.code) {
+      case "LIMIT_FILE_SIZE":
+        return "El archivo es demasiado grande (máximo 10MB)";
+      case "LIMIT_FILE_COUNT":
+        return "Se permiten hasta 10 archivos por publicación";
+      case "LIMIT_UNEXPECTED_FILE":
+        return "Tipo de archivo no permitido";
+      default:
+        return "Error al subir archivos";
+    }
+  }
   return err.message || "Bad request";
 }
 

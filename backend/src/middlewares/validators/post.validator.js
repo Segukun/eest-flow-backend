@@ -42,8 +42,4 @@ export const updatePostSchema = z.object({
   content: contentArray(
     "Post must contain at least one content block",
   ).optional(),
-  attachments: z
-    .array(attachmentSchema)
-    .max(10, "Post cannot contain more than 10 attachments")
-    .optional(),
 });
