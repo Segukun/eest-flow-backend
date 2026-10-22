@@ -506,3 +506,80 @@ describe("POST /api/auth/reset-password", () => {
     assert.equal(res.status, 400);
   });
 });
+
+describe("POST /api/auth/change-password", () => {
+  it("cambia la contraseña de un usuario autenticado y permite volver a entrar", async () => {
+    const sector = await createSector();
+    const user = await createUser({ sectors: [sector._id] });
+    const { client } = await loginAs(user);
+
+    const res = await client.post("/api/auth/change-password").send({
+      newPassword: "otra1234",
+    });
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body, { ok: true });
+    expectNoPasswordLeak(res.body, "change-password response");
+
+    // se puede entrar con la nueva y ya no con la anterior
+    const loginNew = await request(app)
+      .post("/api/auth/login")
+      .send({ email: user.email, password: "otra1234" });
+    assert.equal(loginNew.status, 200);
+
+    const loginOld = await request(app)
+      .post("/api/auth/login")
+      .send({ email: user.email, password: "secret123" });
+    assert.equal(loginOld.status, 401);
+
+    // sigue guardado como hash, nunca en claro
+    const stored = await User.findById(user._id).select("+password");
+    assert.ok(await stored.comparePassword("otra1234"));
+    assert.notEqual(stored.password, "otra1234");
+    assert.match(stored.password, /^\$2[aby]\$/);
+
+    // la sesión abierta sigue siendo válida después del cambio
+    const tasks = await client.get("/api/tasks");
+    assert.equal(tasks.status, 200);
+  });
+
+  it("exige autenticación (401)", async () => {
+    const res = await request(app)
+      .post("/api/auth/change-password")
+      .send({ newPassword: "otra1234" });
+
+    assert.equal(res.status, 401);
+  });
+
+  it("rechaza una nueva contraseña corta con 400", async () => {
+    const sector = await createSector();
+    const user = await createUser({ sectors: [sector._id] });
+    const { client } = await loginAs(user);
+
+    const res = await client.post("/api/auth/change-password").send({
+      newPassword: "123",
+    });
+
+    assert.equal(res.status, 400);
+  });
+
+  it("limpia cualquier código o token de recuperación pendiente", async () => {
+    const sector = await createSector();
+    const user = await createUser({ sectors: [sector._id] });
+    await setResetToken(user, "token-pendiente");
+    await setCodeHash(user, "123456");
+    const { client } = await loginAs(user);
+
+    const res = await client.post("/api/auth/change-password").send({
+      newPassword: "otra1234",
+    });
+
+    assert.equal(res.status, 200);
+
+    const stored = await User.findById(user._id).select(
+      "+resetPasswordToken +resetCode",
+    );
+    assert.ok(!stored.resetPasswordToken, "el token de recuperación debe limpiarse");
+    assert.ok(!stored.resetCode, "el código de recuperación debe limpiarse");
+  });
+});

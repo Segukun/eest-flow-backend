@@ -69,3 +69,15 @@ export const buildResetCodeEmail = (code) => ({
     </div>
   `,
 });
+
+export const buildPasswordChangedEmail = () => ({
+  subject: "Tu contraseña fue cambiada",
+  text: "La contraseña de tu cuenta fue cambiada. Si no fuiste vos, comunicate con un administrador.",
+  html: `
+    <div style="font-family: Arial, Helvetica, sans-serif; color: #1f2937; line-height: 1.5;">
+      <h2 style="margin: 0 0 12px;">Contraseña actualizada</h2>
+      <p style="margin: 0 0 12px;">La contraseña de tu cuenta fue cambiada.</p>
+      <p style="margin: 0;">Si no fuiste vos, comunicate con un administrador.</p>
+    </div>
+  `,
+});

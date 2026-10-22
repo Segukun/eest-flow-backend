@@ -111,6 +111,21 @@ export async function resetPassword(req, res, next) {
   }
 }
 
+export async function changePassword(req, res, next) {
+  try {
+    const { newPassword } = req.body;
+
+    const result = await authService.changeCurrentPassword({
+      userId: req.user._id,
+      newPassword,
+    });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 export async function refreshToken(req, res, next) {
   return res.status(200).json({ message: "Actualizar token" });
 }

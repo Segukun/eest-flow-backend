@@ -123,6 +123,10 @@ Flujo de tres pasos para que un usuario restablezca su contraseña mediante un c
 - `POST /api/auth/verify-code` — body `{ email, code }` — responde `{ valido: true, resetToken }` si el código es correcto y no venció, o `{ valido: false }` en caso contrario.
 - `POST /api/auth/reset-password` — body `{ email, resetToken, newPassword }` — responde `{ ok: true }` y guarda la nueva contraseña (hasheada con bcrypt).
 
+Además, un usuario con sesión iniciada puede cambiar su propia contraseña desde la configuración sin pasar por el flujo de código:
+
+- `POST /api/auth/change-password` — body `{ newPassword }` — requiere sesión; responde `{ ok: true }`. La coincidencia de las dos contraseñas la valida el frontend. Al cambiarla se limpian los códigos o tokens de recuperación pendientes y se envía un email de aviso al usuario.
+
 El código tiene 6 dígitos y vence a los 10 minutos. El `resetToken` también vence a los 10 minutos y es de un solo uso: al usarlo o al pedir un código nuevo se invalida el anterior.
 
 ## Instalación

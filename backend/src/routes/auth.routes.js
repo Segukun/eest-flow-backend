@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  changePassword,
   createAccount,
   forgotPassword,
   login,
@@ -14,6 +15,7 @@ import { authorize } from "../middlewares/user.middleware.js";
 import { validate } from "../middlewares/validate.middleware.js";
 import {
   accountSchema,
+  changePasswordSchema,
   forgotPasswordSchema,
   loginSchema,
   resendCodeSchema,
@@ -35,6 +37,12 @@ router.post(
   "/reset-password",
   validate(resetPasswordSchema),
   resetPassword,
+);
+router.post(
+  "/change-password",
+  authenticate,
+  validate(changePasswordSchema),
+  changePassword,
 );
 router.post(
   "/accounts",

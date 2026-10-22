@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
 import ApiError from "../utils/apiError.js";
-import { buildResetCodeEmail, sendEmail } from "../utils/mailer.js";
+import { buildPasswordChangedEmail, buildResetCodeEmail, sendEmail } from "../utils/mailer.js";
 
 const RESET_TTL_MS = 10 * 60 * 1000;
 
@@ -143,6 +143,34 @@ export const changePassword = async ({ email, resetToken, newPassword }) => {
   user.resetCode = undefined;
   user.resetCodeExpires = undefined;
   await user.save();
+
+  return { ok: true };
+};
+
+// Cambio de contraseña con sesión iniciada (desde la configuración del perfil). No pide la contraseña actual: la coincide de las dos contraseñas la valida el frontend.
+export const changeCurrentPassword = async ({ userId, newPassword }) => {
+  const user = await User.findById(userId).select(
+    "+password +resetPasswordToken +resetPasswordExpires +resetCode +resetCodeExpires",
+  );
+
+  if (!user) throw new ApiError(404, "User not found");
+
+  user.password = await bcrypt.hash(
+    newPassword,
+    Number(process.env.SALT_ROUNDS),
+  );
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpires = undefined;
+  user.resetCode = undefined;
+  user.resetCodeExpires = undefined;
+  await user.save();
+
+  // Se avisa por email, pero no se falla la operación si el envío falla.
+  try {
+    await sendEmail({ to: user.email, ...buildPasswordChangedEmail() });
+  } catch (error) {
+    console.error(error);
+  }
 
   return { ok: true };
 };
