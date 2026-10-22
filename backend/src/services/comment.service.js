@@ -18,8 +18,6 @@ function canModifyComment(comment, user) {
   );
 }
 
-import { safeNotify } from "./notification.service.js";
-
 export async function createComment({ postId, authorId, content, parentCommentId = null }) {
   validateObjectId(postId, "postId");
   validateObjectId(authorId, "authorId");
