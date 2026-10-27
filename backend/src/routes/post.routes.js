@@ -10,6 +10,7 @@ import {
 } from "../controllers/post.controller.js";
 
 import { authenticate } from "../middlewares/auth.middleware.js";
+import { authorize } from "../middlewares/user.middleware.js";
 import { uploadPostFilesMiddleware } from "../middlewares/upload.middleware.js";
 import { validate } from "../middlewares/validate.middleware.js";
 import {
