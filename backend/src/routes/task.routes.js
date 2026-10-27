@@ -21,6 +21,11 @@ router.get("/", authenticate, getTasks);
 router.get("/:id", authenticate, getTasksById);
 router.put("/:id", authenticate, validate(taskSchema.partial()), updateTask);
 router.patch("/:id/move", authenticate, validate(moveTaskSchema), moveTask);
-router.delete("/:id", authenticate, authorize("admin"), softDeleteTask);
+router.delete(
+  "/:id",
+  authenticate,
+  authorize("admin", "collaborator"),
+  softDeleteTask,
+);
 
 export default router;
