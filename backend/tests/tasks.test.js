@@ -315,7 +315,20 @@ describe("PUT /api/tasks/:id", () => {
 });
 
 describe("DELETE /api/tasks/:id", () => {
-  it("un collaborator no puede borrar tareas (403)", async () => {
+  it("exige autenticación y no modifica la tarea (401)", async () => {
+    const { client } = await adminClient();
+    const created = await client.post("/api/tasks").send(validTask());
+
+    const res = await request(app).delete(`/api/tasks/${created.body._id}`);
+
+    assert.equal(res.status, 401);
+    assert.equal(res.body.message, "Authentication required");
+
+    const stored = await Task.findById(created.body._id);
+    assert.equal(stored.deletedAt, null);
+  });
+
+  it("un collaborator hace soft delete y la tarea desaparece del listado", async () => {
     const sector = await createSector();
     const { client } = await loginAs(
       await createUser({ sectors: [sector._id] }),
@@ -325,10 +338,18 @@ describe("DELETE /api/tasks/:id", () => {
 
     const res = await client.delete(`/api/tasks/${created.body._id}`);
 
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 200);
+    assert.equal(res.body.message, "Task soft deleted");
 
     const stored = await Task.findById(created.body._id);
-    assert.equal(stored.deletedAt, null);
+    assert.ok(stored.deletedAt instanceof Date, "debería tener deletedAt");
+
+    const list = await client.get("/api/tasks");
+    assert.equal(list.status, 200);
+    assert.ok(!list.body.some((t) => t._id === created.body._id));
+
+    const one = await client.get(`/api/tasks/${created.body._id}`);
+    assert.equal(one.status, 404);
   });
 
   it("un admin hace soft delete y la tarea desaparece del listado", async () => {
@@ -384,11 +405,33 @@ describe("DELETE /api/tasks/:id", () => {
     assert.notEqual(res.body._id, created.body._id);
   });
 
-  it("devuelve 404 al borrar una tarea inexistente", async () => {
-    const { client } = await adminClient();
+  for (const accountType of ["admin", "collaborator"]) {
+    it(`${accountType}: devuelve 404 al borrar una tarea inexistente`, async () => {
+      const sector = await createSector();
+      const { client } = await loginAs(
+        await createUser({ accountType, sectors: [sector._id] }),
+      );
 
-    const res = await client.delete("/api/tasks/507f1f77bcf86cd799439011");
+      const res = await client.delete("/api/tasks/507f1f77bcf86cd799439011");
 
-    assert.equal(res.status, 404);
-  });
+      assert.equal(res.status, 404);
+      assert.equal(res.body.message, "Task not found");
+    });
+
+    it(`${accountType}: devuelve 400 para un id mal formado sin modificar tareas`, async () => {
+      const sector = await createSector();
+      const { client } = await loginAs(
+        await createUser({ accountType, sectors: [sector._id] }),
+      );
+      const created = await client.post("/api/tasks").send(validTask());
+
+      const res = await client.delete("/api/tasks/no-es-un-objectid");
+
+      assert.equal(res.status, 400);
+      assert.match(res.body.message, /Cast to ObjectId failed/);
+
+      const stored = await Task.findById(created.body._id);
+      assert.equal(stored.deletedAt, null);
+    });
+  }
 });
