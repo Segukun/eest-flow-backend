@@ -18,46 +18,44 @@ const contentBlockSchema = new mongoose.Schema(
   { _id: false },
 );
 
-const attachmentSchema = new mongoose.Schema(
-  {
-    type: {
-      type: String,
-      enum: ["image", "file"],
-      required: true,
-    },
-
-    url: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    path: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    originalName: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 255,
-    },
-
-    mimeType: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    size: {
-      type: Number,
-      required: true,
-      min: 0,
-    },
+const attachmentSchema = new mongoose.Schema({
+  type: {
+    type: String,
+    enum: ["image", "file"],
+    required: true,
   },
-);
+
+  url: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+
+  path: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+
+  originalName: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 255,
+  },
+
+  mimeType: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+
+  size: {
+    type: Number,
+    required: true,
+    min: 0,
+  },
+});
 
 const postSchema = new mongoose.Schema(
   {
@@ -103,6 +101,12 @@ const postSchema = new mongoose.Schema(
       min: 0,
     },
 
+    // Indica si la publicación está fijada al comienzo del foro.
+    pinned: {
+      type: Boolean,
+      default: false,
+    },
+
     active: {
       type: Boolean,
       default: true,
@@ -114,6 +118,7 @@ const postSchema = new mongoose.Schema(
 );
 
 postSchema.index({ active: 1, createdAt: -1 });
+postSchema.index({ active: 1, pinned: -1, createdAt: -1 });
 postSchema.index({ sector: 1, createdAt: -1 });
 
 export default mongoose.model("Post", postSchema);

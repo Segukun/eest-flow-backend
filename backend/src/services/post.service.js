@@ -27,7 +27,10 @@ function normalizeContent(content) {
       const text = block.trim();
 
       if (!text) {
-        throw new ApiError(400, "Post paragraphs cannot be empty");
+        throw new ApiError(
+          400,
+          "Post paragraphs cannot be empty",
+        );
       }
 
       return {
@@ -47,7 +50,10 @@ function normalizeContent(content) {
     const text = block.text.trim();
 
     if (!text) {
-      throw new ApiError(400, "Post paragraphs cannot be empty");
+      throw new ApiError(
+        400,
+        "Post paragraphs cannot be empty",
+      );
     }
 
     return {
@@ -92,17 +98,13 @@ export async function createPost({
 
   const normalizedContent = normalizeContent(content);
 
-  // Generamos el ID antes porque lo vamos a usar
-  // como carpeta en Supabase.
+  // Generamos el ID antes de subir archivos a Supabase.
   const postId = new mongoose.Types.ObjectId();
 
   let attachments = [];
 
   try {
-    attachments = await uploadPostFiles(
-      postId,
-      files,
-    );
+    attachments = await uploadPostFiles(postId, files);
 
     const post = await Post.create({
       _id: postId,
@@ -113,14 +115,11 @@ export async function createPost({
     });
 
     return await Post.findById(post._id)
-      .populate(
-        "author",
-        "name email accountType",
-      )
+      .populate("author", "name email accountType")
       .populate("sector");
   } catch (error) {
-    // Si Mongo falla después de subir archivos,
-    // eliminamos los archivos de Supabase.
+    // Si falla MongoDB después de subir los archivos,
+    // intentamos eliminarlos de Supabase.
     if (attachments.length > 0) {
       try {
         await deleteStorageFiles(
@@ -134,7 +133,11 @@ export async function createPost({
       }
     }
 
-    console.error("[posts] createPost failed:", error?.message || error);
+    console.error(
+      "[posts] createPost failed:",
+      error?.message || error,
+    );
+
     throw error;
   }
 }
@@ -146,7 +149,10 @@ export async function getPosts({
   userId,
 }) {
   page = Math.max(Number(page) || 1, 1);
-  limit = Math.min(Math.max(Number(limit) || 10, 1), 50);
+  limit = Math.min(
+    Math.max(Number(limit) || 10, 1),
+    50,
+  );
 
   const filter = {
     active: true,
@@ -163,7 +169,8 @@ export async function getPosts({
     Post.find(filter)
       .populate("author", "name email accountType")
       .populate("sector")
-      .sort({ createdAt: -1 })
+      // Primero los pineados; después, los más recientes.
+      .sort({ pinned: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
@@ -190,6 +197,8 @@ export async function getPosts({
 
   const postsWithLikeState = posts.map((post) => ({
     ...post,
+    // Compatibilidad con publicaciones antiguas sin este campo.
+    pinned: Boolean(post.pinned),
     isLiked: likedPostIds.has(String(post._id)),
   }));
 
@@ -232,6 +241,7 @@ export async function getPostById(postId, userId) {
 
   return {
     ...post,
+    pinned: Boolean(post.pinned),
     isLiked,
   };
 }
@@ -253,7 +263,10 @@ export async function updatePost({
   }
 
   if (!canModifyPost(post, user)) {
-    throw new ApiError(403, "You cannot modify this post");
+    throw new ApiError(
+      403,
+      "You cannot modify this post",
+    );
   }
 
   if (content !== undefined) {
@@ -280,10 +293,17 @@ export async function disablePost({ postId, user }) {
   }
 
   if (!canModifyPost(post, user)) {
-    throw new ApiError(403, "You cannot delete this post");
+    throw new ApiError(
+      403,
+      "You cannot delete this post",
+    );
   }
 
   post.active = false;
+
+  // Si estaba fijada, deja de estarlo al eliminarse.
+  post.pinned = false;
+
   await post.save();
 
   const attachmentPaths = (post.attachments ?? [])
@@ -294,7 +314,10 @@ export async function disablePost({ postId, user }) {
     try {
       await deleteStorageFiles(attachmentPaths);
     } catch (error) {
-      console.error("Storage cleanup failed:", error.message);
+      console.error(
+        "Storage cleanup failed:",
+        error.message,
+      );
     }
   }
 
@@ -310,4 +333,68 @@ export async function disablePost({ postId, user }) {
   return {
     message: "Post deleted successfully",
   };
+}
+
+/**
+ * Fija o desfija una publicación.
+ *
+ * Regla global:
+ * solamente puede existir una publicación pineada.
+ *
+ * Cuando pinned === true, todas las demás publicaciones
+ * pineadas se desanclan antes de fijar la seleccionada.
+ *
+ * Cuando pinned === false, solo se desancla la seleccionada.
+ */
+export async function setPostPinned({
+  postId,
+  user,
+  pinned,
+}) {
+  validateObjectId(postId, "postId");
+
+  if (user?.accountType !== "admin") {
+    throw new ApiError(
+      403,
+      "Only administrators can pin posts",
+    );
+  }
+
+  if (typeof pinned !== "boolean") {
+    throw new ApiError(
+      400,
+      "pinned must be a boolean",
+    );
+  }
+
+  const post = await Post.findOne({
+    _id: postId,
+    active: true,
+  });
+
+  if (!post) {
+    throw new ApiError(404, "Post not found");
+  }
+
+  if (pinned) {
+    // Desanclamos cualquier otra publicación pineada,
+    // incluso si está inactiva por datos anteriores.
+    await Post.updateMany(
+      {
+        _id: { $ne: post._id },
+        pinned: true,
+      },
+      {
+        $set: { pinned: false },
+      },
+    );
+  }
+
+  post.pinned = pinned;
+
+  await post.save();
+
+  return await Post.findById(post._id)
+    .populate("author", "name email accountType")
+    .populate("sector");
 }

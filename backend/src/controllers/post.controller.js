@@ -1,15 +1,18 @@
 import * as postService from "../services/post.service.js";
-
 import ApiError from "../utils/apiError.js";
 
 export async function createPost(req, res, next) {
   try {
-    // el cliente puede elegir el sector; si no lo manda, se usa el primero del usuario
-    const sectorId = req.body.sector ?? req.user.sectors?.[0];
+    // Si no se indica un sector, usamos el primero del usuario.
+    const sectorId =
+      req.body.sector ?? req.user.sectors?.[0];
 
     if (!sectorId) {
       return next(
-        new ApiError(400, "No sector provided and the user has none assigned"),
+        new ApiError(
+          400,
+          "No sector provided and the user has none assigned",
+        ),
       );
     }
 
@@ -48,7 +51,10 @@ export async function getPosts(req, res, next) {
 
 export async function getPostById(req, res, next) {
   try {
-    const post = await postService.getPostById(req.params.id, req.user._id);
+    const post = await postService.getPostById(
+      req.params.id,
+      req.user._id,
+    );
 
     return res.status(200).json({
       data: post,
@@ -88,30 +94,42 @@ export async function deletePost(req, res, next) {
   }
 }
 
+export async function pinPost(req, res, next) {
+  try {
+    const { pinned } = req.body ?? {};
+
+    if (typeof pinned !== "boolean") {
+      throw new ApiError(
+        400,
+        "The pinned field must be a boolean",
+      );
+    }
+
+    const post = await postService.setPostPinned({
+      postId: req.params.id,
+      user: req.user,
+      pinned,
+    });
+
+    return res.status(200).json({
+      message: pinned
+        ? "Post pinned successfully"
+        : "Post unpinned successfully",
+      data: post,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 function parseContent(content) {
   if (typeof content === "string") {
     try {
       return JSON.parse(content);
     } catch {
-      throw new ApiError(
-        400,
-        "Invalid content JSON",
-      );
+      throw new ApiError(400, "Invalid content JSON");
     }
   }
 
   return content;
-}
-
-export async function pinPost(req, res, next) {
-  try {
-    const post = await setPostPinned({
-      postId: req.params.id,
-      user: req.user,
-      pinned: req.body.pinned,
-    });
-    return res.status(200).json({ data: post });
-  } catch (error) {
-    return next(error);
-  }
 }
