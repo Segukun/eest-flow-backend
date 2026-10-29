@@ -17,6 +17,7 @@ import {
   createPostSchema,
   updatePostSchema,
 } from "../middlewares/validators/post.validator.js";
+import { postCreateLimiter } from "../middlewares/rateLimit.middleware.js";
 
 const router = Router();
 
@@ -27,6 +28,7 @@ router.get("/:id", authenticate, getPostById);
 router.post(
   "/",
   authenticate,
+  postCreateLimiter,
   uploadPostFilesMiddleware,
   validate(createPostSchema),
   createPost,

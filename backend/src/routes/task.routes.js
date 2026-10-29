@@ -13,10 +13,11 @@ import { authorize } from "../middlewares/user.middleware.js";
 import { validate } from "../middlewares/validate.middleware.js";
 import { taskSchema } from "../middlewares/validators/task.validator.js";
 import { moveTaskSchema } from "../middlewares/validators/taskMove.validator.js";
+import { taskCreateLimiter } from "../middlewares/rateLimit.middleware.js";
 
 const router = Router();
 
-router.post("/", authenticate, validate(taskSchema), createTask);
+router.post("/", authenticate, taskCreateLimiter, validate(taskSchema), createTask);
 router.get("/", authenticate, getTasks);
 router.get("/:id", authenticate, getTasksById);
 router.put("/:id", authenticate, validate(taskSchema.partial()), updateTask);
