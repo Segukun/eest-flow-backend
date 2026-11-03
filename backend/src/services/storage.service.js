@@ -1,13 +1,18 @@
 import crypto from "crypto";
 import path from "path";
 
-import { supabase } from "../config/supabase.js";
+import { getSupabase } from "../config/supabase.js";
 import ApiError from "../utils/apiError.js";
 
-const BUCKET = process.env.SUPABASE_STORAGE_BUCKET;
+function getPostStorage() {
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET?.trim();
 
-if (!BUCKET) {
-  throw new Error("SUPABASE_STORAGE_BUCKET is not configured");
+  if (!bucket) {
+    console.error("[storage] SUPABASE_STORAGE_BUCKET is not configured");
+    throw new ApiError(503, "Storage is not configured");
+  }
+
+  return { storage: getSupabase().storage.from(bucket), bucket };
 }
 
 function getAttachmentType(mimeType) {
@@ -34,6 +39,7 @@ export async function uploadPostFiles(postId, files = []) {
     return [];
   }
 
+  const { storage, bucket } = getPostStorage();
   const uploadedFiles = [];
 
   try {
@@ -43,17 +49,15 @@ export async function uploadPostFiles(postId, files = []) {
         file.originalname,
       );
 
-      const { error } = await supabase.storage
-        .from(BUCKET)
-        .upload(storagePath, file.buffer, {
-          contentType: file.mimetype,
-          cacheControl: "3600",
-          upsert: false,
-        });
+      const { error } = await storage.upload(storagePath, file.buffer, {
+        contentType: file.mimetype,
+        cacheControl: "3600",
+        upsert: false,
+      });
 
       if (error) {
         console.error("[storage] upload failed:", {
-          bucket: BUCKET,
+          bucket,
           path: storagePath,
           file: file.originalname,
           mimeType: file.mimetype,
@@ -67,9 +71,7 @@ export async function uploadPostFiles(postId, files = []) {
         );
       }
 
-      const { data } = supabase.storage
-        .from(BUCKET)
-        .getPublicUrl(storagePath);
+      const { data } = storage.getPublicUrl(storagePath);
 
       uploadedFiles.push({
         type: getAttachmentType(file.mimetype),
@@ -98,13 +100,12 @@ export async function deleteStorageFiles(paths = []) {
     return;
   }
 
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .remove(paths);
+  const { storage, bucket } = getPostStorage();
+  const { error } = await storage.remove(paths);
 
   if (error) {
     console.error("[storage] delete failed:", {
-      bucket: BUCKET,
+      bucket,
       paths,
       code: error.code,
       message: error.message,

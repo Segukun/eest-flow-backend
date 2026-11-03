@@ -14,18 +14,7 @@ import sectorRoutes from "./routes/sector.routes.js";
 import taskRoutes from "./routes/task.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
-
-// routes/post.routes.js arrastra config/supabase.js, que lanza al importarse si no
-// encuentra SUPABASE_URL / SUPABASE_SECRET_KEY. Como las rutas cuelgan de app.js,
-// ese throw tumbaba la API completa al arrancar (auth, tasks, users, labels...).
-// Se resuelve de forma diferida para que la configuración ausente no se lleve el resto.
-let postRoutes = null;
-
-try {
-  postRoutes = (await import("./routes/post.routes.js")).default;
-} catch (error) {
-  console.error(`[app] rutas del foro no montadas: ${error.message}`);
-}
+import postRoutes from "./routes/post.routes.js";
 
 const app = express();
 
@@ -47,9 +36,7 @@ app.use("/api/sectors", sectorRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/labels", labelRoutes);
 
-if (postRoutes) {
-  app.use("/api/posts", postRoutes);
-}
+app.use("/api/posts", postRoutes);
 
 app.use("/api", commentRoutes);
 app.use("/api", likeRoutes);
