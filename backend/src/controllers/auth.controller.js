@@ -113,10 +113,11 @@ export async function resetPassword(req, res, next) {
 
 export async function changePassword(req, res, next) {
   try {
-    const { newPassword } = req.body;
+    const { currentPassword, newPassword } = req.body;
 
     const result = await authService.changeCurrentPassword({
       userId: req.user._id,
+      currentPassword,
       newPassword,
     });
 

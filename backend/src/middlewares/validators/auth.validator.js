@@ -45,6 +45,10 @@ export const resetPasswordSchema = z.object({
 
 // Cambio de contraseña con sesión iniciada (configuración del usuario). La coincidencia de las dos contraseñas se valida en el frontend.
 export const changePasswordSchema = z.object({
+  currentPassword: z
+    .string()
+    .min(1, "La contraseña actual es obligatoria.")
+    .max(64, "Max 64 characters"),
   newPassword: z
     .string()
     .min(6, "Password must be at least 6 characters")

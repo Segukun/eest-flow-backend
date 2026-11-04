@@ -129,13 +129,26 @@ describe("PUT /api/users/:id", () => {
 
     const res = await client
       .put(`/api/users/${user._id}`)
-      .send({ name: "Nombre Nuevo" });
+      .send({ name: "Nombre Nuevo", email: "nuevo@test.local" });
 
     assert.equal(res.status, 200);
     assert.equal(res.body.name, "Nombre Nuevo");
 
     const stored = await User.findById(user._id);
     assert.equal(stored.name, "Nombre Nuevo");
+    assert.equal(stored.email, "nuevo@test.local");
+    assert.equal(res.body.email, stored.email);
+    assert.equal(res.body.accountType, "collaborator");
+    assert.equal(res.body.active, true);
+    assert.equal(res.body.sectors[0]._id, sector._id.toString());
+    assert.equal(res.body.sectors[0].name, sector.name);
+    assert.ok(!("password" in res.body));
+    expectNoPasswordLeak(res.body);
+    // La cookie identifica por id y sigue sirviendo al cambiar el email.
+    assert.equal((await client.get(`/api/users/${user._id}`)).status, 200);
+    const login = await request(app).post("/api/auth/login")
+      .send({ email: "nuevo@test.local", password: "secret123" });
+    assert.equal(login.status, 200);
   });
 
   it("un collaborator no puede tocar el accountType ni los sectors, ni sobre sí mismo", async () => {

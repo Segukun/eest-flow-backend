@@ -514,6 +514,7 @@ describe("POST /api/auth/change-password", () => {
     const { client } = await loginAs(user);
 
     const res = await client.post("/api/auth/change-password").send({
+      currentPassword: "secret123",
       newPassword: "otra1234",
     });
 
@@ -557,6 +558,7 @@ describe("POST /api/auth/change-password", () => {
     const { client } = await loginAs(user);
 
     const res = await client.post("/api/auth/change-password").send({
+      currentPassword: "secret123",
       newPassword: "123",
     });
 
@@ -571,6 +573,7 @@ describe("POST /api/auth/change-password", () => {
     const { client } = await loginAs(user);
 
     const res = await client.post("/api/auth/change-password").send({
+      currentPassword: "secret123",
       newPassword: "otra1234",
     });
 
@@ -581,5 +584,96 @@ describe("POST /api/auth/change-password", () => {
     );
     assert.ok(!stored.resetPasswordToken, "el token de recuperación debe limpiarse");
     assert.ok(!stored.resetCode, "el código de recuperación debe limpiarse");
+  });
+});
+
+
+describe("seguridad del cambio de contraseña propio", () => {
+  const cases = [
+    ["actual incorrecta", { currentPassword: "incorrecta", newPassword: "distinta123" }, "La contraseña actual es incorrecta."],
+    ["misma contraseña", { currentPassword: "secret123", newPassword: "secret123" }, "La nueva contraseña debe ser diferente a la contraseña actual."],
+    ["sin contraseña actual", { newPassword: "distinta123" }],
+    ["contraseña actual vacía", { currentPassword: "", newPassword: "distinta123" }],
+    ["sin contraseña nueva", { currentPassword: "secret123" }],
+    ["nueva mayor a 64 caracteres", { currentPassword: "secret123", newPassword: "a".repeat(65) }],
+  ];
+
+  for (const [name, payload, message] of cases) {
+    it(`rechaza ${name} sin modificar contraseña ni recuperación pendiente`, async () => {
+      const sector = await createSector();
+      const user = await createUser({ sectors: [sector._id] });
+      await setResetToken(user, "pendiente");
+      const before = await User.findById(user._id).select("+password +resetPasswordToken");
+      const { client } = await loginAs(user);
+
+      const res = await client.post("/api/auth/change-password").send(payload);
+
+      assert.equal(res.status, 400);
+      if (message) assert.deepEqual(res.body, { message });
+      expectNoPasswordLeak(res.body);
+      const stored = await User.findById(user._id).select("+password +resetPasswordToken");
+      assert.equal(stored.password, before.password);
+      assert.equal(stored.resetPasswordToken, before.resetPasswordToken);
+      assert.ok(await stored.comparePassword("secret123"));
+      const login = await request(app).post("/api/auth/login")
+        .send({ email: user.email, password: "secret123" });
+      assert.equal(login.status, 200);
+      assert.equal((await client.get("/api/tasks")).status, 200);
+    });
+  }
+
+  it("un admin cambia solo su propia contraseña aunque envíe otro userId", async () => {
+    const sector = await createSector();
+    const admin = await createUser({ accountType: "admin", sectors: [sector._id] });
+    const other = await createUser({ sectors: [sector._id] });
+    const { client } = await loginAs(admin);
+
+    const res = await client.post("/api/auth/change-password").send({
+      userId: other._id.toString(),
+      currentPassword: "secret123",
+      newPassword: "distinta123",
+    });
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body, { ok: true });
+    const storedAdmin = await User.findById(admin._id).select("+password");
+    const storedOther = await User.findById(other._id).select("+password");
+    assert.ok(await storedAdmin.comparePassword("distinta123"));
+    assert.ok(await storedOther.comparePassword("secret123"));
+  });
+});
+
+describe("reutilización en recuperación de contraseña", () => {
+  it("rechaza la misma contraseña y permite reintentar con otra usando el token verificado", async () => {
+    const sector = await createSector();
+    const user = await createUser({ sectors: [sector._id] });
+    await setCodeHash(user, "123456");
+    const verified = await request(app).post("/api/auth/verify-code")
+      .send({ email: user.email, code: "123456" });
+    assert.equal(verified.body.valido, true);
+    const resetToken = verified.body.resetToken;
+    const before = await User.findById(user._id).select("+password +resetPasswordToken +resetPasswordExpires");
+
+    const res = await request(app).post("/api/auth/reset-password")
+      .send({ email: user.email, resetToken, newPassword: "secret123" });
+
+    assert.equal(res.status, 400);
+    assert.deepEqual(res.body, { message: "La nueva contraseña debe ser diferente a la contraseña actual." });
+    const stored = await User.findById(user._id).select("+password +resetPasswordToken +resetPasswordExpires");
+    assert.equal(stored.password, before.password);
+    assert.equal(stored.resetPasswordToken, before.resetPasswordToken);
+    assert.deepEqual(stored.resetPasswordExpires, before.resetPasswordExpires);
+    const login = await request(app).post("/api/auth/login")
+      .send({ email: user.email, password: "secret123" });
+    assert.equal(login.status, 200);
+
+    const retry = await request(app).post("/api/auth/reset-password")
+      .send({ email: user.email, resetToken, newPassword: "distinta123" });
+    assert.equal(retry.status, 200);
+    assert.deepEqual(retry.body, { ok: true });
+    const reused = await request(app).post("/api/auth/reset-password")
+      .send({ email: user.email, resetToken, newPassword: "tercera123" });
+    assert.equal(reused.status, 400);
+    assert.equal(reused.body.message, "Invalid or expired reset token");
   });
 });
