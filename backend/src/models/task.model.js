@@ -96,6 +96,13 @@ const taskSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    // Quién la archivó (se muestra en el archivero).
+    deletedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   { timestamps: true },
 );

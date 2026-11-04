@@ -140,15 +140,50 @@ export async function deleteTaskAttachment(req, res, next) {
   }
 }
 
+/**
+ * Archiva una tarea (soft delete).
+ */
 export async function softDeleteTask(req, res, next) {
   try {
     const { id } = req.params;
 
-    await taskService.softDeleteTask(id);
+    await taskService.softDeleteTask(id, req.user);
 
     return res.status(200).json({
       message: "Task soft deleted",
     });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+/* ---------------------------- archivero ---------------------------- */
+
+export async function getArchivedTasks(req, res, next) {
+  try {
+    const data = await taskService.getArchivedTasks();
+
+    return res.status(200).json(data);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function restoreTask(req, res, next) {
+  try {
+    const task = await taskService.restoreTask(req.params.id);
+
+    return res.status(200).json(task);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function permanentlyDeleteTask(req, res, next) {
+  try {
+    const result = await taskService.permanentlyDeleteTask(req.params.id);
+
+    return res.status(200).json(result);
   } catch (error) {
     return next(error);
   }

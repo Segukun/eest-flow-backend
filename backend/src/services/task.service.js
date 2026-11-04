@@ -25,9 +25,6 @@ const notifyAssigned = (task, recipients, actor) =>
 /**
  * Convierte documentos Mongoose a objetos de respuesta y
  * agrega URLs firmadas a los archivos adjuntos.
- *
- * Las URLs se cachean para evitar generar una nueva en
- * cada consulta automática del tablero.
  */
 const withAttachmentUrls = async (taskDocument) => {
   if (!taskDocument) return taskDocument;
@@ -85,11 +82,7 @@ export const createTask = async (taskData, actor) => {
     position,
   });
 
-  await notifyAssigned(
-    task,
-    toIds(task.assignedUser),
-    actor,
-  );
+  await notifyAssigned(task, toIds(task.assignedUser), actor);
 
   return withAttachmentUrls(task);
 };
@@ -131,10 +124,7 @@ export const updateTask = async (taskId, taskData, actor) => {
   const update = { ...taskData };
 
   // Si cambia de columna por edición, queda al final de la nueva.
-  if (
-    update.state !== undefined &&
-    update.state !== previous.state
-  ) {
+  if (update.state !== undefined && update.state !== previous.state) {
     update.position = await nextPosition(
       update.category ?? previous.category,
       update.state,
@@ -172,15 +162,10 @@ export const updateTask = async (taskId, taskData, actor) => {
 };
 
 /**
- * Mueve una tarea a una columna y la inserta ANTES de beforeId.
- * (null = al final).
- *
- * Renumera la columna destino sin empates.
+ * Mueve una tarea a una columna y la inserta ANTES de beforeId
+ * (null = al final). Renumera la columna destino sin empates.
  */
-export const moveTask = async (
-  taskId,
-  { state, beforeId = null },
-) => {
+export const moveTask = async (taskId, { state, beforeId = null }) => {
   if (!mongoose.isValidObjectId(taskId)) {
     throw new ApiError(400, "Invalid task id");
   }
@@ -244,16 +229,8 @@ export const moveTask = async (
 
 /**
  * Agrega archivos a una tarea.
- *
- * 1. Comprueba que exista la tarea.
- * 2. Sube los archivos a Supabase.
- * 3. Guarda los metadatos en MongoDB.
  */
-export const addTaskAttachments = async (
-  taskId,
-  files,
-  actor,
-) => {
+export const addTaskAttachments = async (taskId, files, actor) => {
   if (!mongoose.isValidObjectId(taskId)) {
     throw new ApiError(400, "Invalid task id");
   }
@@ -286,14 +263,12 @@ export const addTaskAttachments = async (
     // Si falla MongoDB después de subir, intentamos limpiar Storage.
     await Promise.all(
       uploaded.map((attachment) =>
-        deleteTaskStoredFile(attachment.path).catch(
-          (cleanupError) => {
-            console.error(
-              "No se pudo limpiar el adjunto tras fallar MongoDB:",
-              cleanupError,
-            );
-          },
-        ),
+        deleteTaskStoredFile(attachment.path).catch((cleanupError) => {
+          console.error(
+            "No se pudo limpiar el adjunto tras fallar MongoDB:",
+            cleanupError,
+          );
+        }),
       ),
     );
 
@@ -306,10 +281,7 @@ export const addTaskAttachments = async (
 /**
  * Elimina un adjunto de una tarea.
  */
-export const removeTaskAttachment = async (
-  taskId,
-  attachmentId,
-) => {
+export const removeTaskAttachment = async (taskId, attachmentId) => {
   if (
     !mongoose.isValidObjectId(taskId) ||
     !mongoose.isValidObjectId(attachmentId)
@@ -340,8 +312,6 @@ export const removeTaskAttachment = async (
 
   await task.save();
 
-  // La referencia se elimina primero de MongoDB.
-  // Si Storage falla, se registra para limpieza posterior.
   try {
     await deleteTaskStoredFile(storagePath);
   } catch (error) {
@@ -354,15 +324,17 @@ export const removeTaskAttachment = async (
   return withAttachmentUrls(task);
 };
 
-export const softDeleteTask = async (taskId) => {
-  const task = await Task.findByIdAndUpdate(
-    taskId,
+/**
+ * Archiva una tarea (soft delete). No vuelve a archivar una ya archivada.
+ */
+export const softDeleteTask = async (taskId, actor) => {
+  const task = await Task.findOneAndUpdate(
+    { _id: taskId, deletedAt: null },
     {
       deletedAt: new Date(),
+      deletedBy: actor?._id ?? null,
     },
-    {
-      returnDocument: "after",
-    },
+    { returnDocument: "after" },
   );
 
   if (!task) {
@@ -370,4 +342,87 @@ export const softDeleteTask = async (taskId) => {
   }
 
   return task;
+};
+
+/* ---------------------------- archivero ---------------------------- */
+
+/**
+ * Lista las tareas archivadas, las más recientes primero.
+ * No firma URLs de adjuntos: el archivero solo muestra el conteo.
+ */
+export const getArchivedTasks = async () => {
+  return await Task.find({ deletedAt: { $ne: null } })
+    .sort({ deletedAt: -1 })
+    .populate("deletedBy", "name")
+    .lean();
+};
+
+/**
+ * Restaura una tarea archivada: queda al final de su columna original.
+ */
+export const restoreTask = async (taskId) => {
+  if (!mongoose.isValidObjectId(taskId)) {
+    throw new ApiError(400, "Invalid task id");
+  }
+
+  const task = await Task.findOne({
+    _id: taskId,
+    deletedAt: { $ne: null },
+  });
+
+  if (!task) {
+    throw new ApiError(404, "Archived task not found");
+  }
+
+  // Los títulos son únicos entre tareas activas (igual que en createTask).
+  const conflict = await Task.findOne({
+    title: task.title,
+    deletedAt: null,
+    _id: { $ne: taskId },
+  });
+
+  if (conflict) {
+    throw new ApiError(
+      409,
+      "Ya existe una tarea activa con ese título. Renombrala antes de restaurar.",
+    );
+  }
+
+  task.position = await nextPosition(task.category, task.state, taskId);
+  task.deletedAt = null;
+  task.deletedBy = null;
+
+  await task.save();
+
+  return withAttachmentUrls(task);
+};
+
+/**
+ * Elimina definitivamente una tarea YA archivada, junto con sus archivos.
+ */
+export const permanentlyDeleteTask = async (taskId) => {
+  if (!mongoose.isValidObjectId(taskId)) {
+    throw new ApiError(400, "Invalid task id");
+  }
+
+  const task = await Task.findOne({
+    _id: taskId,
+    deletedAt: { $ne: null },
+  });
+
+  if (!task) {
+    throw new ApiError(404, "Archived task not found");
+  }
+
+  await Promise.all(
+    (task.attachments ?? []).map((attachment) =>
+      deleteTaskStoredFile(attachment.path).catch((error) => {
+        console.error("No se pudo eliminar un archivo adjunto:", error);
+      }),
+    ),
+  );
+
+  await task.deleteOne();
+
+  return { message: "Task permanently deleted" };
 };

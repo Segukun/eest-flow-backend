@@ -9,6 +9,9 @@ import {
   updateTask,
   uploadTaskAttachments,
   deleteTaskAttachment,
+  getArchivedTasks,
+  restoreTask,
+  permanentlyDeleteTask,
 } from "../controllers/task.controller.js";
 
 import { authenticate } from "../middlewares/auth.middleware.js";
@@ -34,6 +37,9 @@ router.post(
 
 router.get("/", authenticate, getTasks);
 
+// Archivero: va ANTES de "/:id", si no Express lo toma como un id.
+router.get("/archived", authenticate, getArchivedTasks);
+
 router.get("/:id", authenticate, getTasksById);
 
 router.put(
@@ -50,6 +56,16 @@ router.patch(
   moveTask,
 );
 
+// Archivero: restaurar y eliminar definitivamente.
+router.patch("/:id/restore", authenticate, restoreTask);
+
+router.delete(
+  "/:id/permanent",
+  authenticate,
+  authorize("admin"),
+  permanentlyDeleteTask,
+);
+
 // Adjuntos de tareas.
 router.post(
   "/:id/attachments",
@@ -64,7 +80,7 @@ router.delete(
   deleteTaskAttachment,
 );
 
-// Eliminación de tareas.
+// Archivado (soft delete) de tareas.
 router.delete(
   "/:id",
   authenticate,
