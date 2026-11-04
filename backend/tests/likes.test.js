@@ -53,7 +53,7 @@ describe("POST /api/posts/:postId/like", () => {
     assert.equal(notificacion.category, "forum");
     assert.equal(notificacion.post.toString(), postId);
     assert.equal(notificacion.actor.toString(), liker._id.toString());
-    assert.equal(notificacion.dedupeKey, `like:${postId}:${liker._id}`);
+    assert.equal(notificacion.dedupeKey, `post_like:${postId}:${liker._id}`);
   });
 
   it("es idempotente: likear dos veces no duplica like ni notificación", async () => {

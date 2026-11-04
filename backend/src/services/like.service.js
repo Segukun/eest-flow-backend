@@ -84,6 +84,7 @@ export async function likePost({ postId, userId }) {
       await safeNotify({
         recipients: [post.author],
         actorId: userId,
+        post: postId,
         category: "forum",
         type: "post_like",
         title: `A ${liker?.name ?? "alguien"} le gustó tu publicación`,

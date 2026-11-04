@@ -16,12 +16,10 @@ export async function globalSetup() {
   process.env.PORT = "0";
   process.env.CORS_ORIGIN = "http://localhost:5173";
 
-  // config/supabase.js lanza al importarse si faltan estas variables y eso deja
-  // las rutas del foro sin montar. En test no se habla con Supabase (los posts
-  // de prueba son solo texto), así que alcanza con valores ficticios.
-  process.env.SUPABASE_URL = "http://localhost:54321";
-  process.env.SUPABASE_SECRET_KEY = "test-supabase-secret";
-  process.env.SUPABASE_STORAGE_BUCKET = "test-bucket";
+  // El foro debe funcionar sin storage. Nunca usar configuración remota en tests.
+  delete process.env.SUPABASE_URL;
+  delete process.env.SUPABASE_SECRET_KEY;
+  delete process.env.SUPABASE_STORAGE_BUCKET;
 
   mongoReplSet = await MongoMemoryReplSet.create({
     replSet: { count: 1 },

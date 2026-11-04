@@ -1,6 +1,10 @@
+import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 
-dotenv.config();
+// Usar el .env del backend incluso si Node se ejecuta desde otro directorio.
+dotenv.config({
+  path: fileURLToPath(new URL("../.env", import.meta.url)),
+});
 
 import { connectDB } from "./config/db.js";
 import { startDueTasksJob } from "./jobs/dueTasks.job.js";

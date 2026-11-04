@@ -1,17 +1,34 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
+import ApiError from "../utils/apiError.js";
 
-if (!supabaseUrl) {
-  throw new Error("SUPABASE_URL is not configured");
+let supabase = null;
+
+// Leer configuración al usar storage, no al importar las rutas del foro.
+export function getSupabase() {
+  if (supabase) {
+    return supabase;
+  }
+
+  const missing = ["SUPABASE_URL", "SUPABASE_SECRET_KEY"].filter(
+    (name) => !process.env[name]?.trim(),
+  );
+
+  if (missing.length > 0) {
+    console.error("[storage] Missing configuration:", missing.join(", "));
+    throw new ApiError(503, "Storage is not configured");
+  }
+
+  try {
+    supabase = createClient(
+      process.env.SUPABASE_URL.trim(),
+      process.env.SUPABASE_SECRET_KEY.trim(),
+    );
+  } catch {
+    // El error del SDK puede contener configuración: no registrar sus valores.
+    console.error("[storage] Supabase configuration is invalid");
+    throw new ApiError(503, "Storage configuration is invalid");
+  }
+
+  return supabase;
 }
-
-if (!supabaseSecretKey) {
-  throw new Error("SUPABASE_SECRET_KEY is not configured");
-}
-
-export const supabase = createClient(
-  supabaseUrl,
-  supabaseSecretKey,
-);
