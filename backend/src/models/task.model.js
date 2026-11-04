@@ -1,5 +1,38 @@
 import mongoose from "mongoose";
 
+const taskAttachmentSchema = new mongoose.Schema(
+  {
+    originalName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    path: {
+      type: String,
+      required: true,
+    },
+    mimeType: {
+      type: String,
+      required: true,
+    },
+    size: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { _id: true },
+);
+
 const taskSchema = new mongoose.Schema(
   {
     title: {
@@ -42,7 +75,7 @@ const taskSchema = new mongoose.Schema(
       default: "pending",
     },
 
-    // orden vertical dentro de (category + state); menor = más arriba
+    // Orden vertical dentro de (category + state); menor = más arriba.
     position: {
       type: Number,
       default: 0,
@@ -50,6 +83,12 @@ const taskSchema = new mongoose.Schema(
 
     labels: {
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: "Label" }],
+      default: [],
+    },
+
+    // Archivos adjuntos de la tarea.
+    attachments: {
+      type: [taskAttachmentSchema],
       default: [],
     },
 
