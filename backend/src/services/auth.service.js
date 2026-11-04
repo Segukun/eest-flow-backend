@@ -118,6 +118,23 @@ export const verifyCode = async ({ email, code }) => {
   return { valido: true, resetToken };
 };
 
+// Comparar contra el hash antes de guardar, compartido por perfil y recuperación.
+const saveNewPassword = async (user, newPassword) => {
+  if (await user.comparePassword(newPassword)) {
+    throw new ApiError(400, "La nueva contraseña debe ser diferente a la contraseña actual.");
+  }
+
+  user.password = await bcrypt.hash(
+    newPassword,
+    Number(process.env.SALT_ROUNDS),
+  );
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpires = undefined;
+  user.resetCode = undefined;
+  user.resetCodeExpires = undefined;
+  await user.save();
+};
+
 export const changePassword = async ({ email, resetToken, newPassword }) => {
   const user = await User.findOne({ email: normalizeEmail(email) }).select(
     "+password +resetPasswordToken +resetPasswordExpires +resetCode +resetCodeExpires",
@@ -134,36 +151,23 @@ export const changePassword = async ({ email, resetToken, newPassword }) => {
     throw new ApiError(400, "Invalid or expired reset token");
   }
 
-  user.password = await bcrypt.hash(
-    newPassword,
-    Number(process.env.SALT_ROUNDS),
-  );
-  user.resetPasswordToken = undefined;
-  user.resetPasswordExpires = undefined;
-  user.resetCode = undefined;
-  user.resetCodeExpires = undefined;
-  await user.save();
+  await saveNewPassword(user, newPassword);
 
   return { ok: true };
 };
 
-// Cambio de contraseña con sesión iniciada (desde la configuración del perfil). No pide la contraseña actual: la coincide de las dos contraseñas la valida el frontend.
-export const changeCurrentPassword = async ({ userId, newPassword }) => {
+// Cambio del propio perfil: el usuario objetivo proviene de la sesión autenticada.
+export const changeCurrentPassword = async ({ userId, currentPassword, newPassword }) => {
   const user = await User.findById(userId).select(
     "+password +resetPasswordToken +resetPasswordExpires +resetCode +resetCodeExpires",
   );
 
   if (!user) throw new ApiError(404, "User not found");
+  if (!currentPassword || !(await user.comparePassword(currentPassword))) {
+    throw new ApiError(400, "La contraseña actual es incorrecta.");
+  }
 
-  user.password = await bcrypt.hash(
-    newPassword,
-    Number(process.env.SALT_ROUNDS),
-  );
-  user.resetPasswordToken = undefined;
-  user.resetPasswordExpires = undefined;
-  user.resetCode = undefined;
-  user.resetCodeExpires = undefined;
-  await user.save();
+  await saveNewPassword(user, newPassword);
 
   // Se avisa por email, pero no se falla la operación si el envío falla.
   try {
