@@ -435,3 +435,61 @@ describe("DELETE /api/tasks/:id", () => {
     });
   }
 });
+
+describe("límite de título de tareas", () => {
+  it("crea con 100 caracteres y recorta espacios externos", async () => {
+    const { client } = await adminClient();
+    const title = "a".repeat(100);
+    const res = await client.post("/api/tasks").send(validTask({ title: `  ${title}  ` }));
+    assert.equal(res.status, 201);
+    assert.equal(res.body.title, title);
+    const stored = await Task.findById(res.body._id);
+    assert.equal(stored.title, title);
+  });
+
+  it("rechaza crear con 101 caracteres sin persistir la tarea", async () => {
+    const { client } = await adminClient();
+    const res = await client.post("/api/tasks").send(validTask({ title: "a".repeat(101) }));
+    assert.equal(res.status, 400);
+    assert.equal(res.body.message, "Max 100 characters");
+    assert.equal(await Task.countDocuments({}), 0);
+  });
+
+  it("edita con 100 caracteres", async () => {
+    const { client } = await adminClient();
+    const created = await client.post("/api/tasks").send(validTask());
+    const title = "b".repeat(100);
+    const res = await client.put(`/api/tasks/${created.body._id}`).send({ title });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.title, title);
+    const stored = await Task.findById(created.body._id);
+    assert.equal(stored.title, title);
+  });
+
+  it("rechaza editar con 101 caracteres y conserva el título anterior", async () => {
+    const { client } = await adminClient();
+    const created = await client.post("/api/tasks").send(validTask());
+    const res = await client.put(`/api/tasks/${created.body._id}`).send({ title: "b".repeat(101) });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.message, "Max 100 characters");
+    const stored = await Task.findById(created.body._id);
+    assert.equal(stored.title, created.body.title);
+  });
+
+  it("rechaza títulos de solo espacios al crear y editar", async () => {
+    const { client } = await adminClient();
+    const invalid = await client.post("/api/tasks").send(validTask({ title: "   " }));
+    assert.equal(invalid.status, 400);
+    assert.equal(invalid.body.message, "Title is required");
+    const created = await client.post("/api/tasks").send(validTask());
+    const res = await client.put(`/api/tasks/${created.body._id}`).send({ title: "   " });
+    assert.equal(res.status, 400);
+    assert.equal(res.body.message, "Title is required");
+    assert.equal((await Task.findById(created.body._id)).title, created.body.title);
+  });
+
+  it("el modelo también rechaza títulos mayores a 100", async () => {
+    await assert.rejects(Task.create(validTask({ title: "x".repeat(101) })), { name: "ValidationError" });
+    assert.equal(await Task.countDocuments({}), 0);
+  });
+});
