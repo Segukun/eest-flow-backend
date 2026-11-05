@@ -190,3 +190,23 @@ export async function permanentlyDeleteTask(req, res, next) {
     return next(error);
   }
 }
+
+export async function restoreArchivedTasks(req, res, next) {
+  try {
+    const result = await taskService.restoreTasks(req.body.ids);
+
+    return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function deleteArchivedTasks(req, res, next) {
+  try {
+    const result = await taskService.permanentlyDeleteTasks(req.body.ids);
+
+    return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+}

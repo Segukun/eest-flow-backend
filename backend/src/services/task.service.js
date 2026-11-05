@@ -435,3 +435,43 @@ export const permanentlyDeleteTask = async (taskId) => {
 
   return { message: "Task permanently deleted" };
 };
+
+/**
+ * Restaura varias tareas archivadas. Una por una, para que un título
+ * duplicado en una no impida restaurar las demás.
+ */
+export const restoreTasks = async (ids = []) => {
+  const uniqueIds = [...new Set(ids.map(String))];
+  const restored = [];
+  const failed = [];
+
+  for (const id of uniqueIds) {
+    try {
+      restored.push(await restoreTask(id));
+    } catch (error) {
+      failed.push({ id, message: error.message });
+    }
+  }
+
+  return { restored, failed };
+};
+
+/**
+ * Elimina definitivamente varias tareas YA archivadas.
+ */
+export const permanentlyDeleteTasks = async (ids = []) => {
+  const uniqueIds = [...new Set(ids.map(String))];
+  const deleted = [];
+  const failed = [];
+
+  for (const id of uniqueIds) {
+    try {
+      await permanentlyDeleteTask(id);
+      deleted.push(id);
+    } catch (error) {
+      failed.push({ id, message: error.message });
+    }
+  }
+
+  return { deleted, failed };
+};

@@ -12,6 +12,8 @@ import {
   getArchivedTasks,
   restoreTask,
   permanentlyDeleteTask,
+  restoreArchivedTasks,
+  deleteArchivedTasks,
 } from "../controllers/task.controller.js";
 
 import { authenticate } from "../middlewares/auth.middleware.js";
@@ -20,6 +22,7 @@ import { validate } from "../middlewares/validate.middleware.js";
 
 import { taskSchema } from "../middlewares/validators/task.validator.js";
 import { moveTaskSchema } from "../middlewares/validators/taskMove.validator.js";
+import { bulkTaskIdsSchema } from "../middlewares/validators/taskBulk.validator.js";
 
 import { taskCreateLimiter } from "../middlewares/rateLimit.middleware.js";
 import { uploadTaskFilesMiddleware } from "../middlewares/uploadTask.middleware.js";
@@ -40,6 +43,22 @@ router.get("/", authenticate, getTasks);
 // Archivero: va ANTES de "/:id", si no Express lo toma como un id.
 router.get("/archived", authenticate, getArchivedTasks);
 
+// Archivero en lote: restaurar (cualquiera) y eliminar definitivamente (admin).
+router.post(
+  "/archived/restore",
+  authenticate,
+  validate(bulkTaskIdsSchema),
+  restoreArchivedTasks,
+);
+
+router.post(
+  "/archived/delete",
+  authenticate,
+  authorize("admin"),
+  validate(bulkTaskIdsSchema),
+  deleteArchivedTasks,
+);
+
 router.get("/:id", authenticate, getTasksById);
 
 router.put(
@@ -56,7 +75,7 @@ router.patch(
   moveTask,
 );
 
-// Archivero: restaurar y eliminar definitivamente.
+// Archivero: una sola tarea.
 router.patch("/:id/restore", authenticate, restoreTask);
 
 router.delete(
