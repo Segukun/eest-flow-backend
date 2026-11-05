@@ -1,5 +1,9 @@
 import Category from "../models/category.model.js";
 import ApiError from "../utils/apiError.js";
+import {
+  buildSectorVisibilityFilter,
+  canAccessBySector,
+} from "./visibility.service.js";
 
 export const createCategory = async (categoryData) => {
   const exists = await Category.findOne({ name: categoryData.name.trim() });
@@ -9,13 +13,32 @@ export const createCategory = async (categoryData) => {
   return await Category.create(categoryData);
 };
 
-export const getCategories = async () => {
-  return await Category.find({ active: true });
+// Admin: todas. Colaborador: solo las de sus sectores.
+export const getCategories = async (user) => {
+  return await Category.find({
+    active: true,
+    ...buildSectorVisibilityFilter(user),
+  });
 };
 
-export const getCategoryById = async (categoryId) => {
+// Ids de las categorías que el usuario puede ver (lo usa task.service).
+export const getVisibleCategoryIds = async (user) => {
+  const categories = await Category.find({
+    active: true,
+    ...buildSectorVisibilityFilter(user),
+  }).select("_id");
+
+  return categories.map((category) => category._id);
+};
+
+export const getCategoryById = async (categoryId, user) => {
   const category = await Category.findById(categoryId);
-  if (!category) throw new ApiError(404, "Category not found");
+
+  // 404 (no 403) para no revelar que la categoría existe.
+  if (!category || !canAccessBySector(user, category.sectors)) {
+    throw new ApiError(404, "Category not found");
+  }
+
   return category;
 };
 
@@ -28,7 +51,6 @@ export const updateCategory = async (categoryId, categoryData) => {
   return category;
 };
 
-//Las categorias van a tener un soft delete para que sea consistente con el resto del sistema. Como quedan solo desactivadas no rompe tanto el tema de las tareas asociadas.Y en el frontend tirar un "estas seguro, vas a eliminar la categoria de las siguientes tarjetas..." o algo por el estilo.
 //TODO: Cuando pasa esto eliminar el contenido del campo category de las tarjetas asociadas.
 export const disableCategory = async (categoryId) => {
   const category = await Category.findByIdAndUpdate(

@@ -26,6 +26,7 @@ router.get("/:id", authenticate, getCategoryById);
 router.put(
   "/:id",
   authenticate,
+  authorize("admin"),
   validate(categorySchema.partial()),
   updateCategory,
 );

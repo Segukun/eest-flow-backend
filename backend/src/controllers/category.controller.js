@@ -18,7 +18,7 @@ export const createCategory = async (req, res, next) => {
 
 export async function getCategories(req, res, next) {
   try {
-    const data = await categoryService.getCategories();
+    const data = await categoryService.getCategories(req.user);
     return res.status(200).json(data);
   } catch (error) {
     return next(error);
@@ -28,7 +28,7 @@ export async function getCategories(req, res, next) {
 export async function getCategoryById(req, res, next) {
   try {
     const { id } = req.params;
-    const category = await categoryService.getCategoryById(id);
+    const category = await categoryService.getCategoryById(id, req.user);
     return res.status(200).json(category);
   } catch (error) {
     return next(error);
