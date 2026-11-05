@@ -96,10 +96,11 @@ export async function moveTask(req, res, next) {
     const { id } = req.params;
     const { state, beforeId } = req.body;
 
-    const task = await taskService.moveTask(id, {
-      state,
-      beforeId,
-    });
+    const task = await taskService.moveTask(
+      id,
+      { state, beforeId },
+      req.user,
+    );
 
     return res.status(200).json(task);
   } catch (error) {
