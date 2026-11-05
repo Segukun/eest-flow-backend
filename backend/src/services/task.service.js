@@ -22,6 +22,28 @@ const notifyAssigned = (task, recipients, actor) =>
     link: `/?task=${task._id}`,
   });
 
+const notifyUpdated = (task, recipients, actor) =>
+  safeNotify({
+    recipients,
+    actorId: actor?._id,
+    category: "task",
+    type: "task_updated",
+    title: "Tarea actualizada",
+    description: `Se modificó la tarea "${task.title}".`,
+    link: `/?task=${task._id}`,
+  });
+
+// Compara valores persistidos; reordenar IDs o reenviar los mismos datos no avisa.
+const idSet = (list) => JSON.stringify([...new Set(toIds(list))].sort());
+const hasRelevantChanges = (before, after) =>
+  ["title", "description", "priority", "state"].some(
+    (field) => before[field] !== after[field],
+  ) ||
+  (before.dueDate?.getTime() ?? null) !== (after.dueDate?.getTime() ?? null) ||
+  String(before.category ?? "") !== String(after.category ?? "") ||
+  idSet(before.assignedUser) !== idSet(after.assignedUser) ||
+  idSet(before.labels) !== idSet(after.labels);
+
 /**
  * Convierte documentos Mongoose a objetos de respuesta y
  * agrega URLs firmadas a los archivos adjuntos.
@@ -115,7 +137,7 @@ export const updateTask = async (taskId, taskData, actor) => {
   const previous = await Task.findOne({
     _id: taskId,
     deletedAt: null,
-  }).select("assignedUser state category");
+  }).select("title description priority dueDate assignedUser state category labels");
 
   if (!previous) {
     throw new ApiError(404, "Task not found");
@@ -148,14 +170,13 @@ export const updateTask = async (taskId, taskData, actor) => {
     throw new ApiError(404, "Task not found");
   }
 
-  if (taskData.assignedUser !== undefined) {
-    const before = toIds(previous.assignedUser);
+  if (hasRelevantChanges(previous, task)) {
+    const before = new Set(toIds(previous.assignedUser));
+    const assigned = toIds(task.assignedUser);
 
-    const newlyAssigned = toIds(task.assignedUser).filter(
-      (id) => !before.includes(id),
-    );
-
-    await notifyAssigned(task, newlyAssigned, actor);
+    // Cada destinatario recibe un solo aviso: asignación nueva o actualización.
+    await notifyAssigned(task, assigned.filter((id) => !before.has(id)), actor);
+    await notifyUpdated(task, assigned.filter((id) => before.has(id)), actor);
   }
 
   return withAttachmentUrls(task);
@@ -165,7 +186,7 @@ export const updateTask = async (taskId, taskData, actor) => {
  * Mueve una tarea a una columna y la inserta ANTES de beforeId
  * (null = al final). Renumera la columna destino sin empates.
  */
-export const moveTask = async (taskId, { state, beforeId = null }) => {
+export const moveTask = async (taskId, { state, beforeId = null }, actor) => {
   if (!mongoose.isValidObjectId(taskId)) {
     throw new ApiError(400, "Invalid task id");
   }
@@ -224,7 +245,13 @@ export const moveTask = async (taskId, { state, beforeId = null }) => {
     })),
   );
 
-  return withAttachmentUrls(await Task.findById(taskId));
+  const moved = await Task.findById(taskId);
+
+  if (moved && task.state !== moved.state) {
+    await notifyUpdated(moved, toIds(moved.assignedUser), actor);
+  }
+
+  return withAttachmentUrls(moved);
 };
 
 /**
