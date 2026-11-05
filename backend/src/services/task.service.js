@@ -350,8 +350,17 @@ export const softDeleteTask = async (taskId, actor) => {
  * Lista las tareas archivadas, las más recientes primero.
  * No firma URLs de adjuntos: el archivero solo muestra el conteo.
  */
-export const getArchivedTasks = async () => {
-  return await Task.find({ deletedAt: { $ne: null } })
+export const getArchivedTasks = async ({ category } = {}) => {
+  const filter = { deletedAt: { $ne: null } };
+
+  if (category) {
+    if (!mongoose.isValidObjectId(category)) {
+      throw new ApiError(400, "Invalid category id");
+    }
+    filter.category = category;
+  }
+
+  return await Task.find(filter)
     .sort({ deletedAt: -1 })
     .populate("deletedBy", "name")
     .lean();

@@ -161,7 +161,9 @@ export async function softDeleteTask(req, res, next) {
 
 export async function getArchivedTasks(req, res, next) {
   try {
-    const data = await taskService.getArchivedTasks();
+    const data = await taskService.getArchivedTasks({
+      category: req.query.category,
+    });
 
     return res.status(200).json(data);
   } catch (error) {
