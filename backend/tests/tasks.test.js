@@ -189,15 +189,18 @@ describe("POST /api/tasks", () => {
     assert.equal(stored.category, null);
   });
 
-  it("rechaza un title duplicado con 409", async () => {
+  it("permite crear dos tareas activas con el mismo título", async () => {
     const { client } = await adminClient();
     const payload = validTask();
 
-    await client.post("/api/tasks").send(payload);
-    const res = await client.post("/api/tasks").send(payload);
+    const first = await client.post("/api/tasks").send(payload);
+    const second = await client.post("/api/tasks").send(payload);
 
-    assert.equal(res.status, 409);
-    assert.equal(await Task.countDocuments({}), 1);
+    assert.equal(first.status, 201);
+    assert.equal(second.status, 201);
+    assert.notEqual(first.body._id, second.body._id);
+    assert.equal(second.body.title, payload.title);
+    assert.equal(await Task.countDocuments({ title: payload.title, deletedAt: null }), 2);
   });
 });
 
@@ -243,6 +246,23 @@ describe("GET /api/tasks/:id", () => {
 });
 
 describe("PUT /api/tasks/:id", () => {
+  it("permite cambiar el título de una tarea por el de otra tarea activa", async () => {
+    const { client } = await adminClient();
+    const first = await client.post("/api/tasks").send(validTask());
+    const second = await client.post("/api/tasks").send(validTask());
+    assert.equal(first.status, 201);
+    assert.equal(second.status, 201);
+
+    const updated = await client
+      .put(`/api/tasks/${second.body._id}`)
+      .send({ title: first.body.title });
+
+    assert.equal(updated.status, 200);
+    assert.equal(updated.body.title, first.body.title);
+    assert.notEqual(first.body._id, updated.body._id);
+    assert.equal(await Task.countDocuments({ title: first.body.title, deletedAt: null }), 2);
+  });
+
   it("actualiza state y labels, y el cambio queda persistido", async () => {
     const sector = await createSector();
     const category = await createCategory({ sectors: [sector._id] });
@@ -434,6 +454,57 @@ describe("DELETE /api/tasks/:id", () => {
       assert.equal(stored.deletedAt, null);
     });
   }
+});
+
+describe("restaurar tareas archivadas con títulos repetidos", () => {
+  it("restaura una tarea aunque otra activa tenga el mismo título", async () => {
+    const { client } = await adminClient();
+    const payload = validTask();
+    const archived = await client.post("/api/tasks").send(payload);
+    assert.equal(archived.status, 201);
+    assert.equal((await client.delete(`/api/tasks/${archived.body._id}`)).status, 200);
+    const active = await client.post("/api/tasks").send(payload);
+    assert.equal(active.status, 201);
+
+    const restored = await client.patch(`/api/tasks/${archived.body._id}/restore`);
+
+    assert.equal(restored.status, 200);
+    assert.equal(restored.body._id, archived.body._id);
+    assert.equal(restored.body.title, payload.title);
+    assert.equal(restored.body.position, active.body.position + 1);
+    assert.equal(restored.body.deletedAt, null);
+    assert.equal(restored.body.deletedBy, null);
+    assert.equal(await Task.countDocuments({ title: payload.title, deletedAt: null }), 2);
+  });
+
+  it("restaura en lote varias tareas con el mismo título sin duplicar IDs", async () => {
+    const { client } = await adminClient();
+    const payload = validTask();
+    const first = await client.post("/api/tasks").send(payload);
+    const second = await client.post("/api/tasks").send(payload);
+    assert.equal(first.status, 201);
+    assert.equal(second.status, 201);
+    assert.equal((await client.delete(`/api/tasks/${first.body._id}`)).status, 200);
+    assert.equal((await client.delete(`/api/tasks/${second.body._id}`)).status, 200);
+    const active = await client.post("/api/tasks").send(payload);
+    assert.equal(active.status, 201);
+
+    const result = await client.post("/api/tasks/archived/restore").send({
+      ids: [first.body._id, second.body._id, first.body._id],
+    });
+
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.body.failed, []);
+    assert.deepEqual(
+      result.body.restored.map((task) => task._id),
+      [first.body._id, second.body._id],
+    );
+    assert.deepEqual(
+      result.body.restored.map((task) => task.position),
+      [active.body.position + 1, active.body.position + 2],
+    );
+    assert.equal(await Task.countDocuments({ title: payload.title, deletedAt: null }), 3);
+  });
 });
 
 describe("límite de título de tareas", () => {

@@ -86,15 +86,6 @@ const nextPosition = async (category, state, excludeId = null) => {
 };
 
 export const createTask = async (taskData, actor) => {
-  const exists = await Task.findOne({
-    title: taskData.title,
-    deletedAt: null,
-  });
-
-  if (exists) {
-    throw new ApiError(409, "A task with that title already exists");
-  }
-
   const state = taskData.state ?? "pending";
   const position = await nextPosition(taskData.category, state);
 
@@ -410,20 +401,6 @@ export const restoreTask = async (taskId) => {
     throw new ApiError(404, "Archived task not found");
   }
 
-  // Los títulos son únicos entre tareas activas (igual que en createTask).
-  const conflict = await Task.findOne({
-    title: task.title,
-    deletedAt: null,
-    _id: { $ne: taskId },
-  });
-
-  if (conflict) {
-    throw new ApiError(
-      409,
-      "Ya existe una tarea activa con ese título. Renombrala antes de restaurar.",
-    );
-  }
-
   task.position = await nextPosition(task.category, task.state, taskId);
   task.deletedAt = null;
   task.deletedBy = null;
@@ -464,8 +441,8 @@ export const permanentlyDeleteTask = async (taskId) => {
 };
 
 /**
- * Restaura varias tareas archivadas. Una por una, para que un título
- * duplicado en una no impida restaurar las demás.
+ * Restaura varias tareas archivadas. Cada ID se procesa por separado para
+ * informar los fallos individuales sin impedir las demás restauraciones.
  */
 export const restoreTasks = async (ids = []) => {
   const uniqueIds = [...new Set(ids.map(String))];
