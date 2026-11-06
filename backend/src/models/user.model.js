@@ -30,6 +30,10 @@ const userSchema = new mongoose.Schema(
         message: "user must belong to at least one sector",
       },
     },
+    profilePicture: {
+      type: String,
+      default: null,
+    },
     active: {
       type: Boolean,
       default: true,
@@ -68,11 +72,3 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 };
 
 export default mongoose.model("User", userSchema);
-
-// Asi estaba antes. Estos serian los sectores que hay que crear.
-// enum: [
-//        "student_affairs",
-//        "secretary_office",
-//        "school_administration",
-//        "teachers",
-//      ], // Preceptoria, secretaria, direccion, profesores.
