@@ -103,15 +103,40 @@ describe("POST /api/tasks", () => {
     assert.equal(await Task.countDocuments({}), 0);
   });
 
-  it("rechaza una description faltante con 400", async () => {
+  it("crea sin description y persiste el valor vacio por defecto", async () => {
     const { client } = await adminClient();
     const payload = validTask();
     delete payload.description;
 
     const res = await client.post("/api/tasks").send(payload);
 
-    assert.equal(res.status, 400);
+    assert.equal(res.status, 201);
+    assert.equal(res.body.description, "");
+    const stored = await Task.findById(res.body._id);
+    assert.equal(stored.description, "");
+    assert.equal(stored.title, payload.title);
   });
+
+  for (const description of ["", "Texto valido", "a".repeat(500)]) {
+    it(`crea con description de ${description.length} caracteres`, async () => {
+      const { client } = await adminClient();
+      const res = await client.post("/api/tasks").send(validTask({ description }));
+
+      assert.equal(res.status, 201);
+      assert.equal(res.body.description, description);
+      const stored = await Task.findById(res.body._id);
+      assert.equal(stored.description, description);
+    });
+  }
+
+  for (const description of [null, 123, "a".repeat(501)]) {
+    it(`rechaza description invalida: ${typeof description}, longitud ${description?.length ?? "n/a"}`, async () => {
+      const { client } = await adminClient();
+      const res = await client.post("/api/tasks").send(validTask({ description }));
+      assert.equal(res.status, 400);
+      assert.equal(await Task.countDocuments({}), 0);
+    });
+  }
 
   it("rechaza un priority fuera del enum con 400", async () => {
     const { client } = await adminClient();
@@ -283,6 +308,47 @@ describe("PUT /api/tasks/:id", () => {
     assert.equal(stored.state, "completed");
     assert.equal(stored.labels[0].toString(), label._id.toString());
   });
+
+  for (const accountType of ["admin", "collaborator"]) {
+    it(`${accountType} puede borrar la description sin alterar otros campos`, async () => {
+      const sector = await createSector();
+      const { client } = await loginAs(await createUser({ accountType, sectors: [sector._id] }));
+      const payload = validTask({ description: "Texto anterior" });
+      const created = await client.post("/api/tasks").send(payload);
+      assert.equal(created.status, 201);
+
+      const res = await client.put(`/api/tasks/${created.body._id}`).send({ description: "" });
+      assert.equal(res.status, 200);
+      assert.equal(res.body.description, "");
+      const stored = await Task.findById(created.body._id);
+      assert.equal(stored.description, "");
+      for (const field of ["title", "priority", "state", "position", "category", "dueDate", "assignedUser", "labels", "deletedAt"]) {
+        assert.deepEqual(res.body[field], created.body[field]);
+      }
+      const fetched = await client.get(`/api/tasks/${created.body._id}`);
+      assert.equal(fetched.status, 200);
+      assert.equal(fetched.body.description, "");
+    });
+  }
+
+  it("un update vacio conserva la description anterior", async () => {
+    const { client } = await adminClient();
+    const created = await client.post("/api/tasks").send(validTask({ description: "Conservar" }));
+    const res = await client.put(`/api/tasks/${created.body._id}`).send({});
+    assert.equal(res.status, 200);
+    assert.equal(res.body.description, "Conservar");
+    assert.equal((await Task.findById(created.body._id)).description, "Conservar");
+  });
+
+  for (const description of [null, 123, "a".repeat(501)]) {
+    it(`update rechaza description invalida: ${typeof description}, longitud ${description?.length ?? "n/a"}`, async () => {
+      const { client } = await adminClient();
+      const created = await client.post("/api/tasks").send(validTask({ description: "Conservar" }));
+      const res = await client.put(`/api/tasks/${created.body._id}`).send({ description });
+      assert.equal(res.status, 400);
+      assert.equal((await Task.findById(created.body._id)).description, "Conservar");
+    });
+  }
 
   it("es un update parcial: no borra los campos que no se envían", async () => {
     const { client } = await adminClient();

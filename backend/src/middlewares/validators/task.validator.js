@@ -5,8 +5,8 @@ export const taskSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(100, "Max 100 characters"),
   description: z
     .string()
-    .min(1, "Description is required")
-    .max(500, "Max 500 characters"),
+    .max(500, "Max 500 characters")
+    .optional(),
   assignedUser: z.array(objectId("Invalid assignedUser id")).optional(),
   dueDate: z.coerce.date().nullable().optional(),
   priority: z.enum(["low", "medium", "high"]),
