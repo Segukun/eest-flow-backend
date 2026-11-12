@@ -38,6 +38,7 @@ export async function getPosts(req, res, next) {
       page: req.query.page,
       limit: req.query.limit,
       sectorId: req.query.sectorId,
+      search: req.query.search,
       userId: req.user._id,
     });
 

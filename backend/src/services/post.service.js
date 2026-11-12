@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 import Post from "../models/post.model.js";
 import User from "../models/user.model.js";
+import Sector from "../models/sector.model.js";
 import Like from "../models/like.model.js";
 import Notification from "../models/notification.model.js";
 import ApiError from "../utils/apiError.js";
@@ -146,6 +147,7 @@ export async function getPosts({
   page = 1,
   limit = 10,
   sectorId,
+  search,
   userId,
 }) {
   page = Math.max(Number(page) || 1, 1);
@@ -161,6 +163,26 @@ export async function getPosts({
   if (sectorId) {
     validateObjectId(sectorId, "sectorId");
     filter.sector = sectorId;
+  }
+
+  if (search !== undefined && typeof search !== "string") {
+    throw new ApiError(400, "Invalid search query");
+  }
+
+  const query = search?.trim();
+  if (query) {
+    // La entrada es texto literal, nunca una expresión regular del usuario.
+    const pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    const [authors, sectors] = await Promise.all([
+      User.find({ name: pattern }).select("_id").lean(),
+      Sector.find({ name: pattern }).select("_id").lean(),
+    ]);
+
+    filter.$or = [
+      { "content.text": pattern },
+      { author: { $in: authors.map((author) => author._id) } },
+      { sector: { $in: sectors.map((sector) => sector._id) } },
+    ];
   }
 
   const skip = (page - 1) * limit;
