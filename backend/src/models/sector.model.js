@@ -1,3 +1,4 @@
+
 import mongoose from "mongoose";
 
 const sectorSchema = new mongoose.Schema(
@@ -26,6 +27,22 @@ const sectorSchema = new mongoose.Schema(
       trim: true,
       default: "FiUsers",
     },
+
+    // public: el usuario puede unirse directamente.
+    // request: necesita aprobación de un administrador.
+    accessMode: {
+      type: String,
+      enum: ["public", "request"],
+      default: "public",
+    },
+
+    // Contador interno para serializar solicitudes con cambios de accessMode.
+    joinRequestVersion: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
+
     active: {
       type: Boolean,
       default: true,

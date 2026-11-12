@@ -1,3 +1,4 @@
+
 import { z } from "zod";
 
 export const sectorSchema = z.object({
@@ -6,10 +7,23 @@ export const sectorSchema = z.object({
     .trim()
     .min(1, "Name is required")
     .max(50, "Max 50 characters"),
-  description: z.string().trim().max(200, "Max 200 characters").optional(),
+
+  description: z
+    .string()
+    .trim()
+    .max(200, "Max 200 characters")
+    .optional(),
+
   color: z
     .string()
     .trim()
     .max(64, "Max 64 characters")
-    .regex(/^(#[0-9A-Fa-f]{3,8}|var\(--[\w-]+\))$/, "Invalid color format"),
+    .regex(
+      /^(#[0-9A-Fa-f]{3,8}|var\(--[\w-]+\))$/,
+      "Invalid color format",
+    ),
+
+  icon: z.string().trim().max(40).optional(),
+
+  accessMode: z.enum(["public", "request"]).optional(),
 });

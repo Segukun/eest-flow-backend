@@ -1,8 +1,8 @@
+
 import mongoose from "mongoose";
 
 import User from "../models/user.model.js";
 import ApiError from "../utils/apiError.js";
-
 import * as sectorService from "./sector.service.js";
 import { safeNotify } from "./notification.service.js";
 
@@ -55,12 +55,13 @@ const assertCanManageProfilePicture = (userId, requester) => {
   }
 };
 
-const populateUser = (user) => user.populate("sectors", "name color");
+const populateUser = (user) =>
+  user.populate("sectors", "name color accessMode");
 
 export const getUserById = async (userId) => {
   const user = await User.findById(userId).populate(
     "sectors",
-    "name color",
+    "name color accessMode",
   );
 
   if (!user?.active) {
@@ -79,15 +80,15 @@ export const getUsers = async ({ sector } = {}) => {
 
   const users = await User.find(filter).populate(
     "sectors",
-    "name color",
+    "name color accessMode",
   );
 
   return Promise.all(users.map(withProfilePictureUrl));
 };
 
 export const updateUser = async (userId, requester, payload) => {
-  const isSelf = requester._id.toString() === userId;
-  const isAdmin = requester.accountType === "admin";
+  const isSelf = String(requester?._id) === String(userId);
+  const isAdmin = requester?.accountType === "admin";
 
   if (!isSelf && !isAdmin) {
     throw new ApiError(403, "Forbidden");
@@ -105,16 +106,6 @@ export const updateUser = async (userId, requester, payload) => {
     }
   }
 
-  let previousSectorIds = null;
-
-  if (updates.sectors) {
-    await sectorService.validateSectorsExist(updates.sectors);
-
-    const before = await User.findById(userId).select("sectors");
-
-    previousSectorIds = (before?.sectors ?? []).map(String);
-  }
-
   if (updates.email) {
     const emailTaken = await User.findOne({
       email: updates.email,
@@ -126,17 +117,54 @@ export const updateUser = async (userId, requester, payload) => {
     }
   }
 
-  const user = await User.findByIdAndUpdate(userId, updates, {
-    returnDocument: "after",
-    runValidators: true,
-  }).populate("sectors", "name color");
+  let previousSectorIds = null;
+
+  // Los cambios de membresía pasan por sector.service para aplicar:
+  // - protección contra dejar al usuario sin sectores;
+  // - limpieza de tareas y moderadores en categorías que pierde;
+  // - notificaciones de movimiento dirigidas a administradores.
+  if (updates.sectors !== undefined) {
+    const before = await User.findById(userId).select("sectors");
+
+    if (!before) {
+      throw new ApiError(404, "User not found");
+    }
+
+    previousSectorIds = (before.sectors ?? []).map(String);
+
+    await sectorService.updateUserSectors(
+      userId,
+      updates.sectors,
+      requester,
+    );
+
+    delete updates.sectors;
+  }
+
+  let user;
+
+  if (Object.keys(updates).length > 0) {
+    user = await User.findByIdAndUpdate(
+      userId,
+      updates,
+      {
+        returnDocument: "after",
+        runValidators: true,
+      },
+    ).populate("sectors", "name color accessMode");
+  } else {
+    user = await User.findById(userId).populate(
+      "sectors",
+      "name color accessMode",
+    );
+  }
 
   if (!user) {
     throw new ApiError(404, "User not found");
   }
 
   if (previousSectorIds) {
-    const nextIds = user.sectors.map((s) => String(s._id));
+    const nextIds = user.sectors.map((sector) => String(sector._id));
 
     const changed =
       nextIds.length !== previousSectorIds.length ||
@@ -149,8 +177,8 @@ export const updateUser = async (userId, requester, payload) => {
         category: "system",
         type: "sector_changed",
         title: "Se actualizaron tus sectores",
-        description: `Ahora pertenecés a: ${user.sectors.map((s) => s.name).join(", ")}`,
-        link: "/",
+        description: `Ahora pertenecés a: ${user.sectors.map((sector) => sector.name).join(", ")}`,
+        link: "/sectores",
       });
     }
   }
