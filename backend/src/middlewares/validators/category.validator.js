@@ -15,4 +15,6 @@ export const categorySchema = z.object({
   sectors: z
     .array(objectId("Invalid sector id"))
     .min(1, "Category must belong to at least one sector"),
+  moderatorMode: z.enum(["all", "custom"]).optional(),
+  moderators: z.array(objectId("Invalid moderator id")).optional(),
 });

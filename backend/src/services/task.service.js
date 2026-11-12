@@ -9,6 +9,13 @@ import {
   deleteTaskStoredFile,
 } from "./task-attachment-storage.service.js";
 
+import Category from "../models/category.model.js";
+import {
+  canModerateCategory,
+  MODERATOR_REQUIRED_CODE,
+  MODERATOR_REQUIRED_MESSAGE,
+} from "./category.service.js";
+
 const toIds = (list) => (Array.isArray(list) ? list.map(String) : []);
 
 const notifyAssigned = (task, recipients, actor) =>
@@ -85,8 +92,31 @@ const nextPosition = async (category, state, excludeId = null) => {
   return (last?.position ?? -1) + 1;
 };
 
+// Lanza 403 si el usuario no puede dejar tareas en "Terminado" de esa categoría.
+const assertCanMoveToCompleted = async (categoryId, actor) => {
+  if (!categoryId) return;
+
+  const category = await Category.findOne({
+    _id: categoryId,
+    active: true,
+  }).select("moderatorMode moderators");
+
+  if (!canModerateCategory(actor, category)) {
+    throw new ApiError(
+      403,
+      MODERATOR_REQUIRED_MESSAGE,
+      MODERATOR_REQUIRED_CODE,
+    );
+  }
+};
+
 export const createTask = async (taskData, actor) => {
   const state = taskData.state ?? "pending";
+
+  if (state === "completed") {
+    await assertCanMoveToCompleted(taskData.category, actor);
+  }
+
   const position = await nextPosition(taskData.category, state);
 
   const task = await Task.create({
@@ -145,6 +175,20 @@ export const updateTask = async (taskId, taskData, actor) => {
     );
   }
 
+  // Entrar a "Terminado" (por cambio de columna o de categoría) requiere moderación.
+  const finalState = update.state ?? previous.state;
+  const finalCategory =
+    update.category !== undefined ? update.category : previous.category;
+
+  const enteringCompleted =
+    finalState === "completed" &&
+    (previous.state !== "completed" ||
+      String(finalCategory ?? "") !== String(previous.category ?? ""));
+
+  if (enteringCompleted) {
+    await assertCanMoveToCompleted(finalCategory, actor);
+  }
+
   const task = await Task.findOneAndUpdate(
     {
       _id: taskId,
@@ -189,6 +233,11 @@ export const moveTask = async (taskId, { state, beforeId = null }, actor) => {
 
   if (!task) {
     throw new ApiError(404, "Task not found");
+  }
+
+    // Solo al ENTRAR a Terminado; reordenar dentro de Terminado es libre.
+  if (state === "completed" && task.state !== "completed") {
+    await assertCanMoveToCompleted(task.category, actor);
   }
 
   // Soltar una tarjeta sobre sí misma no cambia nada.

@@ -52,6 +52,7 @@ export function errorHandler(err, req, res, next) {
 
   return res.status(statusCode).json({
     message: resolveMessage(err, statusCode),
+    ...(err.errorCode ? { code: err.errorCode } : {}),
   });
 }
 

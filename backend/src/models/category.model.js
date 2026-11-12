@@ -22,6 +22,18 @@ const categorySchema = new mongoose.Schema(
         message: "category must belong to at least one sector",
       },
     },
+
+    // Quién puede mover tareas a "Terminado": todos, o solo los elegidos.
+    moderatorMode: {
+      type: String,
+      enum: ["all", "custom"],
+      default: "all",
+    },
+    moderators: {
+      type: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      default: [],
+    },
+
     active: {
       type: Boolean,
       default: true,
